@@ -95,15 +95,15 @@ struct uk_event {
 	_EVT_SECTION_LABEL(#event "~~", _EVT_HLIST_END(event))
 
 #define _EVT_SECTION_HEADER(event)					\
-	extern const uk_event_handler_t _EVT_HLIST_END(event)[];	\
-	const struct uk_event						\
+	extern uk_event_handler_t _EVT_HLIST_END(event)[];	\
+	struct uk_event						\
 	__used __section(".uk_eventtab_" #event "~")			\
 	_EVT_EVENT(event) = {						\
 		_EVT_HLIST_END(event)					\
 	}
 
 #define _EVT_IMPORT_EVENT(event)					\
-	extern const struct uk_event _EVT_EVENT(event)
+	extern struct uk_event _EVT_EVENT(event)
 
 #define _EVT_HLIST_START(e_ptr)						\
 	((const uk_event_handler_t *)((e_ptr) + 1))
@@ -187,7 +187,7 @@ struct uk_event {
  * @return
  *   One of the UK_EVENT_* macros on success, errno on < 0
  */
-static inline int uk_raise_event_ptr(const struct uk_event *e, void *data)
+static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
 {
 	const uk_event_handler_t *itr;
 	int ret = UK_EVENT_NOT_HANDLED;
