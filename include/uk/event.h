@@ -66,115 +66,23 @@ typedef int (*uk_event_handler_t)(void *data);
 #define UK_EVENT_HANDLED     1  /* The handler handled the event */
 
 struct uk_event {
-	const uk_event_handler_t *hlist_end;
+	const uk_event_handler_t *handlers;
 };
 
-/* Internal macros to create per-event sections. The linker will sort these
- * sections and merge them in the .uk_eventtab section in the final binary. So
- * that we are able to arbitrarly name events (including numbers, underscores,
- * etc.), we use the tilde (~) to mark header and end sections as well as to
- * separate the event name from handler priority. The tilde has a large ASCII
- * value (126) and thus allows us to keep sections in order, irrespective of
- * the chosen event name (and conceptionally also the priority's textual
- * representation).
- */
-#define _EVT_EVENT(event)	uk_event_ ## event
-#define _EVT_HLIST_END(event)	_uk_eventtab_ ## event ## __end
-
-#define __EVT_SECTION_LABEL(section, label)				\
-	__asm__ (							\
-		".pushsection \".uk_eventtab_" section "\", \"a\"\n"	\
-		#label ":\n"						\
-		".popsection\n"						\
-	)
-
-#define _EVT_SECTION_LABEL(section, label)				\
-	__EVT_SECTION_LABEL(section, label)
-
-#define _EVT_SECTION_HLIST_END(event)					\
-	_EVT_SECTION_LABEL(#event "~~", _EVT_HLIST_END(event))
-
-#define _EVT_SECTION_HEADER(event)					\
-	extern uk_event_handler_t _EVT_HLIST_END(event)[];	\
-	struct uk_event						\
-	__used __section(".uk_eventtab_" #event "~")			\
-	_EVT_EVENT(event) = {						\
-		_EVT_HLIST_END(event)					\
-	}
-
-#define _EVT_IMPORT_EVENT(event)					\
-	extern struct uk_event _EVT_EVENT(event)
-
-#define _EVT_HLIST_START(e_ptr)						\
-	((const uk_event_handler_t *)((e_ptr) + 1))
-
-/**
- * Register an event. If the event should be raised from different libraries
- * export its symbol as 'uk_event_name'.
+/* Register an event along with a list of handlers.
  *
  * @param name
- *   Name of the event. The name may contain any characters that can be used
- *   in C identifiers.
+ * 	Name of the event. The name may contain any characters that can be used
+ *	in C identifiers.
+ * @param hndl
+ * 	NULL-terminated array of event handlers. Each member must be an instance of
+ * 	uk_event_handler_t. When the event is raised, the handlers are invoked in
+ * 	the order they are declared in the array.
  */
-#define _UK_EVENT(name)							\
-	_EVT_SECTION_HEADER(name);					\
-	_EVT_SECTION_HLIST_END(name)
-
-#define UK_EVENT(name)							\
-	_UK_EVENT(name)
-
-/**
- * Register an event handler that is called when the specified event is raised.
- * Previous handlers may already handled the event, in which case the handler
- * might not be called.
- *
- * @param event
- *   Event which to register the handler for
- * @param fn
- *   Handler function to be called
- * @param prio
- *   Priority level (0 (earliest) to 9 (latest))
- *   Use the UK_PRIO_AFTER() helper macro for computing priority dependencies.
- */
-#define __UK_EVENT_HANDLER_PRIO(event, fn, prio)			\
-	static const uk_event_handler_t					\
-	__used __section(".uk_eventtab_" #event "~" #prio)		\
-	_uk_eventtab_ ## event ## _ ## prio ## _ ## fn = (fn)
-
-#define _UK_EVENT_HANDLER_PRIO(event, fn, prio)				\
-	__UK_EVENT_HANDLER_PRIO(event, fn, prio)
-
-#define UK_EVENT_HANDLER_PRIO(event, fn, prio)				\
-	_UK_EVENT_HANDLER_PRIO(event, fn, prio)
-
-/* Similar interface without priority.*/
-#define UK_EVENT_HANDLER(event, fn)					\
-	UK_EVENT_HANDLER_PRIO(event, fn, UK_PRIO_LATEST)
-
-/**
- * Helper macro for iterating over event handlers
- *
- * @param itr
- *   Iterator variable (uk_event_handler_t *) which points to the individual
- *   handlers during iteration
- * @param e_ptr
- *   Pointer to uk_event
- */
-#define uk_event_handler_foreach(itr, e_ptr)				\
-	for ((itr) = DECONST(uk_event_handler_t*, _EVT_HLIST_START(e_ptr));\
-	     (itr) < ((e_ptr)->hlist_end);				\
-	     (itr)++)
-
-/**
- * Returns a pointer to the event with the given name.
- *
- * @param name
- *   Name of the event to retrieve a pointer to
- * @return
- *   Pointer to the event (struct uk_event *)
- */
-#define UK_EVENT_PTR(name)						\
-	(&_EVT_EVENT(name))
+#define UK_EVENT(name, hndl)	\
+struct uk_event name = {	\
+	.handlers = hndl	\
+}
 
 /**
  * Raise an event by pointer and invoke the handler chain until the first
@@ -187,16 +95,15 @@ struct uk_event {
  * @return
  *   One of the UK_EVENT_* macros on success, errno on < 0
  */
-static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
+static inline int uk_raise_event(struct uk_event *event, void *data)
 {
-	const uk_event_handler_t *itr;
+	const uk_event_handler_t *h;
 	int ret = UK_EVENT_NOT_HANDLED;
 
-	__event_assert(e);
+	__event_assert(event);
 
-	uk_event_handler_foreach(itr, e) {
-		__event_assert(*itr);
-		ret = ((*itr)(data));
+	for (size_t i = 0; (h = &event->handlers[i]) != NULL; i++) {
+		ret = ((*h)(data));
 		if (ret)
 			break;
 	}
@@ -215,9 +122,8 @@ static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
  * @return
  *   One of the UK_EVENT_* macros on success, errno on < 0
  */
-#define uk_raise_event(event, data)					\
-	({	_EVT_IMPORT_EVENT(event);				\
-		uk_raise_event_ptr(UK_EVENT_PTR(event), data);	})
+#define uk_raise_event_by_name(name, data) \
+	uk_raise_event(&name, data)
 
 #ifdef __cplusplus
 }
