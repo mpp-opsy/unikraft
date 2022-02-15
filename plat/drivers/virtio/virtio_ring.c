@@ -265,15 +265,24 @@ __u64 virtqueue_feature_negotiate(__u64 feature_set)
 int virtqueue_ring_interrupt(void *obj)
 {
 	struct virtqueue *vq = (struct virtqueue *)obj;
-	int rc = 0;
+	int rc;
 
 	UK_ASSERT(vq);
 
 	if (!virtqueue_hasdata(vq))
-		return rc;
+		return 0;
 
 	if (likely(vq->vq_callback))
 		rc = vq->vq_callback(vq, vq->priv);
+
+	/*
+	 * If the device provides a callback to handle ISRs, we let the
+	 * driver decide if the IRQ has been handled or not. Otherwise, we
+	 * expect IRQs to be handled automatically (i.e., the driver just
+	 * ignores them at this point).
+	 */
+	rc = (likely(vq->vq_callback)) ? vq->vq_callback(vq, vq->priv) : 1;
+
 	return rc;
 }
 
