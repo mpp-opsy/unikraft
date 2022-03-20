@@ -132,42 +132,42 @@
 			TCR_CACHE_ATTRS | TCR_SMP_ATTRS)
 
 /* SCTLR_EL1 - System Control Register */
-#define SCTLR_M		(_AC(1, UL) << 0)	/* MMU enable */
-#define SCTLR_A		(_AC(1, UL) << 1)	/* Alignment check enable */
-#define SCTLR_C		(_AC(1, UL) << 2)	/* Data/unified cache enable */
-#define SCTLR_SA	(_AC(1, UL) << 3)	/* Stack alignment check enable */
-#define SCTLR_SA0	(_AC(1, UL) << 4)	/* Stack Alignment Check Enable for EL0 */
-#define SCTLR_CP15BEN	(_AC(1, UL) << 5)	/* System instruction memory barrier enable */
-#define SCTLR_ITD	(_AC(1, UL) << 7)	/* IT disable */
-#define SCTLR_SED	(_AC(1, UL) << 8)	/* SETEND instruction disable */
-#define SCTLR_UMA	(_AC(1, UL) << 9)	/* User mask access */
-#define SCTLR_I		(_AC(1, UL) << 12)	/* Instruction access Cacheability control */
-#define SCTLR_DZE	(_AC(1, UL) << 14)	/* Traps EL0 DC ZVA instructions to EL1 */
-#define SCTLR_UCT	(_AC(1, UL) << 15)	/* Traps EL0 accesses to the CTR_EL0 to EL1 */
-#define SCTLR_nTWI	(_AC(1, UL) << 16)	/* Don't trap EL0 WFI to EL1 */
-#define SCTLR_nTWE	(_AC(1, UL) << 18)	/* Don't trap EL0 WFE to EL1 */
-#define SCTLR_WXN	(_AC(1, UL) << 19)	/* Write permission implies XN */
-#define SCTLR_EOE	(_AC(1, UL) << 24)	/* Endianness of data accesses at EL0 */
-#define SCTLR_EE	(_AC(1, UL) << 25)	/* Endianness of data accesses at EL1 */
-#define SCTLR_UCI	(_AC(1, UL) << 26)	/* Traps EL0 cache instructions to EL1 */
+#define SCTLR_M		(UL(1) << 0)	/* MMU enable */
+#define SCTLR_A		(UL(1) << 1)	/* Alignment check enable */
+#define SCTLR_C		(UL(1) << 2)	/* Data/unified cache enable */
+#define SCTLR_SA	(UL(1) << 3)	/* Stack alignment check enable */
+#define SCTLR_SA0	(UL(1) << 4)	/* Stack Alignment Check Enable for EL0 */
+#define SCTLR_CP15BEN	(UL(1) << 5)	/* System instruction memory barrier enable */
+#define SCTLR_ITD	(UL(1) << 7)	/* IT disable */
+#define SCTLR_SED	(UL(1) << 8)	/* SETEND instruction disable */
+#define SCTLR_UMA	(UL(1) << 9)	/* User mask access */
+#define SCTLR_I		(UL(1) << 12)	/* Instruction access Cacheability control */
+#define SCTLR_DZE	(UL(1) << 14)	/* Traps EL0 DC ZVA instructions to EL1 */
+#define SCTLR_UCT	(UL(1) << 15)	/* Traps EL0 accesses to the CTR_EL0 to EL1 */
+#define SCTLR_nTWI	(UL(1) << 16)	/* Don't trap EL0 WFI to EL1 */
+#define SCTLR_nTWE	(UL(1) << 18)	/* Don't trap EL0 WFE to EL1 */
+#define SCTLR_WXN	(UL(1) << 19)	/* Write permission implies XN */
+#define SCTLR_EOE	(UL(1) << 24)	/* Endianness of data accesses at EL0 */
+#define SCTLR_EE	(UL(1) << 25)	/* Endianness of data accesses at EL1 */
+#define SCTLR_UCI	(UL(1) << 26)	/* Traps EL0 cache instructions to EL1 */
 
 /* Reserve to 1 */
-#define SCTLR_RES1_B11	(_AC(1, UL) << 11)
-#define SCTLR_RES1_B20	(_AC(1, UL) << 20)
-#define SCTLR_RES1_B22	(_AC(1, UL) << 22)
-#define SCTLR_RES1_B23	(_AC(1, UL) << 23)
-#define SCTLR_RES1_B28	(_AC(1, UL) << 28)
-#define SCTLR_RES1_B29	(_AC(1, UL) << 29)
+#define SCTLR_RES1_B11	(UL(1) << 11)
+#define SCTLR_RES1_B20	(UL(1) << 20)
+#define SCTLR_RES1_B22	(UL(1) << 22)
+#define SCTLR_RES1_B23	(UL(1) << 23)
+#define SCTLR_RES1_B28	(UL(1) << 28)
+#define SCTLR_RES1_B29	(UL(1) << 29)
 
 /* Reserve to 0 */
-#define SCTLR_RES0_B6	(_AC(1, UL) << 6)
-#define SCTLR_RES0_B10	(_AC(1, UL) << 10)
-#define SCTLR_RES0_B13	(_AC(1, UL) << 13)
-#define SCTLR_RES0_B17	(_AC(1, UL) << 17)
-#define SCTLR_RES0_B21	(_AC(1, UL) << 21)
-#define SCTLR_RES0_B27	(_AC(1, UL) << 27)
-#define SCTLR_RES0_B30	(_AC(1, UL) << 30)
-#define SCTLR_RES0_B31	(_AC(1, UL) << 31)
+#define SCTLR_RES0_B6	(UL(1) << 6)
+#define SCTLR_RES0_B10	(UL(1) << 10)
+#define SCTLR_RES0_B13	(UL(1) << 13)
+#define SCTLR_RES0_B17	(UL(1) << 17)
+#define SCTLR_RES0_B21	(UL(1) << 21)
+#define SCTLR_RES0_B27	(UL(1) << 27)
+#define SCTLR_RES0_B30	(UL(1) << 30)
+#define SCTLR_RES0_B31	(UL(1) << 31)
 
 /* Bits to set */
 #define SCTLR_SET_BITS	\
@@ -212,7 +212,7 @@
 #define L2_BLOCK	L1_BLOCK
 #define L2_TABLE	L1_TABLE
 
-#define L2_BLOCK_MASK	_AC(0xffffffe00000, UL)
+#define L2_BLOCK_MASK	UL(0xffffffe00000)
 
 /* Level 3 table, 4KiB per entry */
 #define L3_SHIFT	12
@@ -239,17 +239,17 @@
  * Hardware page table definitions.
  */
 /* TODO: Add the upper attributes */
-#define ATTR_MASK_H	_AC(0xfff0000000000000, UL)
-#define ATTR_MASK_L	_AC(0x0000000000000fff, UL)
+#define ATTR_MASK_H	UL(0xfff0000000000000)
+#define ATTR_MASK_L	UL(0x0000000000000fff)
 #define ATTR_MASK	(ATTR_MASK_H | ATTR_MASK_L)
 /* Bits 58:55 are reserved for software */
-#define ATTR_SW_MANAGED	(_AC(1, UL) << 56)
-#define ATTR_SW_WIRED	(_AC(1, UL) << 55)
-#define ATTR_UXN	(_AC(1, UL) << 54)
-#define ATTR_PXN	(_AC(1, UL) << 53)
+#define ATTR_SW_MANAGED	(UL(1) << 56)
+#define ATTR_SW_WIRED	(UL(1) << 55)
+#define ATTR_UXN	(UL(1) << 54)
+#define ATTR_PXN	(UL(1) << 53)
 #define ATTR_XN		(ATTR_PXN | ATTR_UXN)
-#define ATTR_CONTIGUOUS	(_AC(1, UL) << 52)
-#define ATTR_DBM	(_AC(1, UL) << 51)
+#define ATTR_CONTIGUOUS	(UL(1) << 52)
+#define ATTR_DBM	(UL(1) << 51)
 #define ATTR_nG		(1 << 11)
 #define ATTR_AF		(1 << 10)
 #define ATTR_SH(x)	((x) << 8)

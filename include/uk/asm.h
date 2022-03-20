@@ -54,13 +54,24 @@ name:
 .type name, %function;	\
 END(name)
 
-#define _AC(X,Y)    X
-#define _AT(T,X)    X
+/* Macros to avoid undefined or unintended behavior when using integer
+ * constants in C. The GNU assembler does not support these suffixes,
+ * so these evaluate to unsuffixed integer values in asm.
+ */
+# define   U(_x)        (_x)
+# define  UL(_x)        (_x)
+# define ULL(_x)        (_x)
+# define   L(_x)        (_x)
+# define  LL(_x)        (_x)
 
-#else
-#define __AC(X,Y)   (X##Y)
-#define _AC(X,Y)    __AC(X,Y)
-#define _AT(T,X)    ((T)(X))
-#endif
+#else /* __ASSEMBLY */
+
+# define  U_(_x)        (_x##U)
+# define   U(_x)        U_(_x)
+# define  UL(_x)        (_x##UL)
+# define ULL(_x)        (_x##ULL)
+# define   L(_x)        (_x##L)
+# define  LL(_x)        (_x##LL)
+#endif /* __ASSEMBLY __ */
 
 #endif /* __INLCUDE_UK_ASM_H__ */
