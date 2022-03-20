@@ -30,6 +30,8 @@
 #error Do not include this header directly
 #endif
 
+#include <uk/asm/arch.h>
+
 #define CACHE_LINE_SIZE	64
 
 #ifdef __ASSEMBLY__
