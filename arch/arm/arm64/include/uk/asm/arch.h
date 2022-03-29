@@ -33,6 +33,9 @@
 #error Do not include this header directly
 #endif
 
+#include <uk/arch/types.h>
+#include <uk/asm.h>
+
 /**************************************************************************
  * AArch64 System Register Definitions
  *************************************************************************/
@@ -42,6 +45,57 @@
 #define CTR_DMINLINE_WIDTH	4
 #define CTR_IMINLINE_MASK	0xf
 #define CTR_BYTES_PER_WORD	4
+
+/* ID_AA64MMFR0_EL1 - Memory Model Feature Register 1 */
+#define ID_AA64MMFR0_EL1_PARANGE_SHIFT	U(0)
+#define ID_AA64MMFR0_EL1_PARANGE_MASK	ULL(0xf)
+
+#define PARANGE_0000	U(32)
+#define PARANGE_0001	U(36)
+#define PARANGE_0010	U(40)
+#define PARANGE_0011	U(42)
+#define PARANGE_0100	U(44)
+#define PARANGE_0101	U(48)
+#define PARANGE_0110	U(52)
+
+#define ID_AA64MMFR0_EL1_ECV_SHIFT		U(60)
+#define ID_AA64MMFR0_EL1_ECV_MASK		ULL(0xf)
+#define ID_AA64MMFR0_EL1_ECV_NOT_SUPPORTED	ULL(0x0)
+#define ID_AA64MMFR0_EL1_ECV_SUPPORTED		ULL(0x1)
+#define ID_AA64MMFR0_EL1_ECV_SELF_SYNCH	ULL(0x2)
+
+#define ID_AA64MMFR0_EL1_FGT_SHIFT		U(56)
+#define ID_AA64MMFR0_EL1_FGT_MASK		ULL(0xf)
+#define ID_AA64MMFR0_EL1_FGT_SUPPORTED		ULL(0x1)
+#define ID_AA64MMFR0_EL1_FGT_NOT_SUPPORTED	ULL(0x0)
+
+#define ID_AA64MMFR0_EL1_TGRAN4_SHIFT		U(28)
+#define ID_AA64MMFR0_EL1_TGRAN4_MASK		ULL(0xf)
+#define ID_AA64MMFR0_EL1_TGRAN4_SUPPORTED	ULL(0x0)
+#define ID_AA64MMFR0_EL1_TGRAN4_NOT_SUPPORTED	ULL(0xf)
+
+#define ID_AA64MMFR0_EL1_TGRAN64_SHIFT		U(24)
+#define ID_AA64MMFR0_EL1_TGRAN64_MASK		ULL(0xf)
+#define ID_AA64MMFR0_EL1_TGRAN64_SUPPORTED	ULL(0x0)
+#define ID_AA64MMFR0_EL1_TGRAN64_NOT_SUPPORTED	ULL(0xf)
+
+#define ID_AA64MMFR0_EL1_TGRAN16_SHIFT		U(20)
+#define ID_AA64MMFR0_EL1_TGRAN16_MASK		ULL(0xf)
+#define ID_AA64MMFR0_EL1_TGRAN16_SUPPORTED	ULL(0x1)
+#define ID_AA64MMFR0_EL1_TGRAN16_NOT_SUPPORTED	ULL(0x0)
+
+/* ID_AA64MMFR2_EL1 - Memory Model Feature Register 2 */
+#define ID_AA64MMFR2_EL1		S3_0_C0_C7_2
+
+#define ID_AA64MMFR2_EL1_ST_SHIFT	U(28)
+#define ID_AA64MMFR2_EL1_ST_MASK	ULL(0xf)
+
+#define ID_AA64MMFR2_EL1_CCIDX_SHIFT	U(20)
+#define ID_AA64MMFR2_EL1_CCIDX_MASK	ULL(0xf)
+#define ID_AA64MMFR2_EL1_CCIDX_LENGTH	U(4)
+
+#define ID_AA64MMFR2_EL1_CNP_SHIFT	U(0)
+#define ID_AA64MMFR2_EL1_CNP_MASK	ULL(0xf)
 
 /* MAIR_EL1 - Memory Attribute Indirection Register */
 #define MAIR_ATTR_MASK(idx)	(0xff << ((n)* 8))
@@ -102,12 +156,15 @@
 #define TCR_ASID_16	(1 << 36)
 
 #define TCR_IPS_SHIFT	32
-#define TCR_IPS_32BIT	(0 << TCR_IPS_SHIFT)
-#define TCR_IPS_36BIT	(1 << TCR_IPS_SHIFT)
-#define TCR_IPS_40BIT	(2 << TCR_IPS_SHIFT)
-#define TCR_IPS_42BIT	(3 << TCR_IPS_SHIFT)
-#define TCR_IPS_44BIT	(4 << TCR_IPS_SHIFT)
-#define TCR_IPS_48BIT	(5 << TCR_IPS_SHIFT)
+#define TCR_IPS_MASK	0x7
+#define TCR_IPS_32BIT	(UL(0) << TCR_IPS_SHIFT)
+#define TCR_IPS_36BIT	(UL(1) << TCR_IPS_SHIFT)
+#define TCR_IPS_40BIT	(UL(2) << TCR_IPS_SHIFT)
+#define TCR_IPS_42BIT	(UL(3) << TCR_IPS_SHIFT)
+#define TCR_IPS_44BIT	(UL(4) << TCR_IPS_SHIFT)
+#define TCR_IPS_48BIT	(UL(5) << TCR_IPS_SHIFT)
+#define TCR_IPS_52BIT	(UL(6) << TCR_IPS_SHIFT)
+ 
 
 #define TCR_TG1_SHIFT	30
 #define TCR_TG1_16K	(1 << TCR_TG1_SHIFT)
@@ -139,6 +196,7 @@
 
 #define TCR_T1SZ_SHIFT	16
 #define TCR_T0SZ_SHIFT	0
+#define TCR_T0SZ_MASK	0x1f
 #define TCR_T1SZ(x)	((x) << TCR_T1SZ_SHIFT)
 #define TCR_T0SZ(x)	((x) << TCR_T0SZ_SHIFT)
 #define TCR_TxSZ(x)	(TCR_T1SZ(x) | TCR_T0SZ(x))
@@ -147,29 +205,36 @@
  * VMSAv8-64 Definitions
  *************************************************************************/
 
+/* The following definitions are for Stage 1 translations using
+ * 4KiB granule and a 48-bit VA space.
+ *
+ * Notice: Here we use the VMSAv8-A table indexing convention,
+ *         and not the one of Unikraft's paging API.
+ */
+
+#define PT_LEVELS		4
+#define PT_PTES_PER_LEVEL	512
+
+#define PAGE_SIZE		UL(0x1000)
+#define PAGE_MASK		(~(PAGE_SIZE - 1))
+#define PAGE_SHIFT		12
+
 /* Level 0 table, 512GiB per entry */
 #define L0_SHIFT	39
 #define L0_SIZE		(1ul << L0_SHIFT)
 #define L0_OFFSET	(L0_SIZE - 1ul)
-#define L0_INVAL	0x0 /* An invalid address */
-	/* 0x1 Level 0 doesn't support block translation */
-	/* 0x2 also marks an invalid address */
 #define L0_TABLE	0x3 /* A next-level table */
 
 /* Level 1 table, 1GiB per entry */
 #define L1_SHIFT	30
 #define L1_SIZE 	(1 << L1_SHIFT)
 #define L1_OFFSET 	(L1_SIZE - 1)
-#define L1_INVAL	L0_INVAL
-#define L1_BLOCK	0x1
 #define L1_TABLE	L0_TABLE
 
 /* Level 2 table, 2MiB per entry */
 #define L2_SHIFT	21
 #define L2_SIZE 	(1 << L2_SHIFT)
 #define L2_OFFSET 	(L2_SIZE - 1)
-#define L2_INVAL	L1_INVAL
-#define L2_BLOCK	L1_BLOCK
 #define L2_TABLE	L1_TABLE
 
 #define L2_BLOCK_MASK	UL(0xffffffe00000)
@@ -179,9 +244,6 @@
 #define L3_SIZE 	(1 << L3_SHIFT)
 #define L3_OFFSET 	(L3_SIZE - 1)
 #define L3_SHIFT	12
-#define L3_INVAL	0x0
-	/* 0x1 is reserved */
-	/* 0x2 also marks an invalid address */
 #define L3_PAGE		0x3
 
 #define L0_ENTRIES_SHIFT 9
@@ -192,12 +254,32 @@
 #define Ln_ENTRIES	(1 << Ln_ENTRIES_SHIFT)
 #define Ln_ADDR_MASK	(Ln_ENTRIES - 1)
 #define Ln_TABLE_MASK	((1 << 12) - 1)
+
 #define Ln_TABLE	0x3
 #define Ln_BLOCK	0x1
+#define Ln_INVAL	0x0
 
 /*
- * Definitions for Block and Page descriptor attributes
+ * PTE Definitions
  */
+#define PT_LEVEL_SHIFT		9
+#define PT_OFFS_BITS		12
+
+#define PTE_Lx_VALID_BIT	UL(1)
+
+#define PTE_Lx_TYPE_BIT		(UL(1) << 1)
+#define PTE_Lx_TYPE_SHIFT	1
+
+#define PTE_Lx_TYPE_BLOCK	0
+#define PTE_Lx_TYPE_TABLE	1
+
+#define PTE_Lx_TABLE_PADDR_MASK	0x0000fffffffff000 /* [47-12] */
+
+#define PTE_L2_BLOCK_PADDR_MASK	0x0000ffffffe00000 /* [47-30] */
+#define PTE_L1_BLOCK_PADDR_MASK	0x0000ffffc0000000 /* [47-21] */
+#define PTE_L0_PAGE_PADDR_MASK	0x0000fffffffff000 /* [47-12] */
+
+/* Definitions for Block and Page descriptors */
 #define ATTR_MASK_H	UL(0xfff0000000000000)
 #define ATTR_MASK_L	UL(0x0000000000000fff)
 #define ATTR_MASK	(ATTR_MASK_H | ATTR_MASK_L)

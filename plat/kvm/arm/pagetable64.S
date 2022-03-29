@@ -64,6 +64,71 @@
 virt_bits:
 	.byte 32, 36, 40, 42, 44, 48
 
+/* Outputs a single PTE
+ *
+ * @param upper_attr upper attribute bits
+ * @param paddr physical address
+ * @param lower_attr lower attribute bits
+ */
+.macro pte paddr, attr_lower, attr_upper
+	.quad \attr_upper + \paddr + \attr_lower
+.endm
+
+/* Outputs a number of PTEs for a contiguous mapping starting at
+ * the provided physical address.
+ *
+ */
+.marcro pte_fill paddr, pages, lvl, attr_upper, attr_lower
+.ifle \pages
+	.exitm
+.endif
+	pte (\paddr + PAGE_Lx_SIZE(\lvl) * 0), \lvl, \attr_upper, \attr_lower
+.ifgt \pages - 8
+
+.else
+
+.endif
+.endm
+
+/* Outputs a number of invalid PTEs
+ *
+ * @param paddr physical address (not used)
+ * @param pages number of PTEs
+ */
+.macro pte_zero paddr=0, pages
+	.fill \pages, 0x8, 0
+.endm
+
+.align 0x1000
+aarch64_l0:
+	pte aarch64_l1_pt0, 0, TYPE_TABLE | VALID
+	pte aarch64_l1_pt1, 0, TYPE_TABLE | VALID
+
+aarch64_l1_pt0:
+	pte aarch64_l2_pt0, 0, TYPE_TABLE | VALID
+	pte aarch64_l2_pt1, 0, TYPE_TABLE | VALID
+	pte_fill (RAM_START + 1GiB), 253, 1, 0, SECT_ATTR_NORMAL | TYPE_BLOCK | VALID 
+	pte_fill PCIE_ECAM_START, 256, 1, 0, SECT_ATTR_DEVICE_nGnRnE | TYPE_BLOCK | VALID 
+
+aarch64_l1_pt1:
+	pte_fill PCIE_ADDR_START, 512, 1, 0, SECT_ATTR_NORMAL | TYPE_BLOCK | VALID 
+
+aarch64_l2_pt0:
+	pte_zero HOLE_START, 64
+	pte_fill DEVICE_ADDR_START, 448, 2, 0, SECT_ATTR_DEVICE_nGnRnE | TYPE BLOCK | VALID
+
+aarch64_l2_pt1:
+	pte aarch64_l3_pt0, 0 TYPE_TABLE | VALID
+	pte_fill RAM_ADDR_START, 512, 2, 0, SECT_ATTR_NORMAL_EXEC | TYPE_BLOCK | VALID 
+
+/* FIXME:
+ * - How to set up fine-grained attributes?
+ * - How to set up to img size?
+ */
+aarch64_l3_pt0:
+	pte_fill RAM_ADDR_START, ALIGN_UP(DTB_SIZE, PAGE_SIZE), SECT_ATTR_NORMAL_RO
+
+
 /*
  * We will use a direct map for physical address and virtual address
  * (PA = VA 1:1 mapping)
@@ -80,72 +145,84 @@ ENTRY(create_pagetables)
 	 * We have 2 L1 tables to map 0 ~ 512GB, 512 GB ~ 1TB.
 	 * Link these two tables to L0 entries#0, #1
 	 */
-	mov x6, x14
-	mov x8, #0
-	add x9, x14, #L1_TABLE_OFFSET
-	mov x10, #2
+	mov x6, x14			// L0 base
+	mov x8, #0			// VA: 0x00000000
+	add x9, x14, #L1_TABLE_OFFSET	// PA: L1 addr
+	mov x10, #2			// entry count: 2
 	bl  link_l0_pagetable
 
+	/************************************************************
+	 * 1st L2 Table
+	 ***********************************************************/
 	/*
 	 * Using 1GiB block to map the hole memory (0x0 ~ 0x7ffffff) and device
 	 * address space (0x8000000 ~ 0x3fffffff)
 	 */
 	/* Build a L2 block pagetable */
-	add x6, x14, #L2_TABLE_OFFSET
-	ldr x7, =0 /* NONE ATTR*/
-	mov x8, #HOLE_START
-	mov x9, x8
-	ldr x10, =HOLE_MEM_ENTRIES
+	add x6, x14, #L2_TABLE_OFFSET	// L2 addr
+	ldr x7, =0 /* NONE ATTR*/	// attr
+	mov x8, #HOLE_START		// VA start: 0x00000000
+	mov x9, x8			// PA start: 0x00000000
+	ldr x10, =HOLE_MEM_ENTRIES	// entry count: 64
 	bl  build_l2_block_pagetable
 
-	add x6, x14, #L2_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_DEVICE_nGnRE
-	mov x8, #DEVICE_ADDR_START
-	mov x9, x8
-	ldr x10, =DEVICE_ENTRIES
+	add x6, x14, #L2_TABLE_OFFSET	// L2 addr
+	ldr x7, =SECT_ATTR_DEVICE_nGnRE	// attr
+	mov x8, #DEVICE_ADDR_START	// VA start: 0x08000000
+	mov x9, x8			// PA start: 0x08000000
+	ldr x10, =DEVICE_ENTRIES	// entry count: 448
 	bl  build_l2_block_pagetable
 
 	/* Link this L2 block pagetable to L1 entry */
 	add x6, x14, #L1_TABLE_OFFSET
 	mov x8, #HOLE_START
 	add x9, x14, #L2_TABLE_OFFSET
-	bl  link_l1_pagetable
+	bl  link_l1_pagetable		// add Table PTEs into L1
 
+	/************************************************************
+	 * 1st L1 Table
+	 ***********************************************************/
 	/*
 	 * Using 1GiB block to map RAM address space
 	 * (0x40000000 ~ (256GiB -1)). The RAM areas that contain kernel
 	 * sections will be update later.
 	 */
-	add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
-	ldr x7, =SECT_ATTR_NORMAL
-	mov x8, #RAM_ADDR_START
-	mov x9, x8
-	mov x10, #RAM_L2_ENTRIES
-	bl  build_l1_block_pagetable
+	add x6, x14, #L1_TABLE_OFFSET	// L1 addr
+	ldr x7, =SECT_ATTR_NORMAL	// atttr
+	mov x8, #RAM_ADDR_START		// VA start: 0x40000000
+	mov x9, x8			// PA start: 0x40000000
+	mov x10, #RAM_L2_ENTRIES	// entry count: 255
+	bl  build_l1_block_pagetable	// create L1 PTEs
 
         /*
          * Using 1GiB block to map PCIe ECAM address space
          * (256GiB ~ 512GiB).
          */
-        add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
-        ldr x7, =SECT_ATTR_DEVICE_nGnRnE
-        mov x8, #PCIE_ECAM_START
-        mov x9, x8
-        mov x10, #PCIE_ECAM_L2_ENTRIES
+        add x6, x14, #L1_TABLE_OFFSET
+        ldr x7, =SECT_ATTR_DEVICE_nGnRnE// attr
+        mov x8, #PCIE_ECAM_START	// VA start: 0x4000000000
+        mov x9, x8			// PA start: 0x4000000000
+        mov x10, #PCIE_ECAM_L2_ENTRIES	// entry count: 256
         bl  build_l1_block_pagetable
 
+	/************************************************************
+	 * 2nd L1 Table
+	 ***********************************************************/
 	/*
 	 * Using 1GiB block to map high PCIe address space
 	 * (0x512GiB ~ (1TiB -1)).
 	 */
 	add x6, x14, #L1_TABLE_OFFSET
 	add x6, x6, #__PAGE_SIZE	/* 2nd L2 table page */
-	ldr x7, =SECT_ATTR_DEVICE_nGnRE
-	mov x8, #PCIE_ADDR_START
-	mov x9, x8
-	mov x10, #PCIE_L2_ENTRIES
+	ldr x7, =SECT_ATTR_DEVICE_nGnRE // attr
+	mov x8, #PCIE_ADDR_START	// VA start: 0x8000000000
+	mov x9, x8			// PA start: 0x8000000000
+	mov x10, #PCIE_L2_ENTRIES	// entry count: 512
 	bl  build_l1_block_pagetable
 
+	/************************************************************
+	 * 2nd L2 Table
+	 ***********************************************************/
 	/*
 	 * The text, bss, data and other sections are placed at
 	 * 0x40000000 ~ 0x7fffffff. We use 4k granularity to manage
@@ -153,30 +230,33 @@ ENTRY(create_pagetables)
 	 * L1 -> L2 -> L3 (4K)
 	 */
 	/* 1st: Build a L2 block pagetable */
-	add x6, x14, #L2_TABLE_OFFSET
-	add x6, x6, #__PAGE_SIZE
-	ldr x7, =SECT_ATTR_NORMAL
-	mov x8, #RAM_ADDR_START
-	mov x9, x8
-	mov x10, 512
-	bl  build_l2_block_pagetable
+	add x6, x14, #L2_TABLE_OFFSET	//
+	add x6, x6, #__PAGE_SIZE	// 2nd L2 Table
+	ldr x7, =SECT_ATTR_NORMAL	// attr
+	mov x8, #RAM_ADDR_START		// VA: 0x40000000
+	mov x9, x8			// PA: 0x40000000
+	mov x10, 512			// entry count: 512
+	bl  build_l2_block_pagetable	// create L2 PTEs
 
 	/* 2nd: Link this L2 block pagetable to L1 entry */
 	add x6, x14, #L1_TABLE_OFFSET
 	mov x8, #RAM_ADDR_START
 	add x9, x14, #L2_TABLE_OFFSET
 	add x9, x9, #__PAGE_SIZE
-	bl  link_l1_pagetable
+	bl  link_l1_pagetable		// create table descriptors in L1
 
+	/************************************************************
+	 * L3 Table
+	 ***********************************************************/
 	/* 3rd: Build a L3 pagetable for image occupied memory */
 	add x16, x14, #L3_TABLE_OFFSET
 	mov x17, #RAM_ADDR_START
 
-	mov x6, x16
-	ldr x7, =SECT_ATTR_NORMAL
-	mov x8, x17
-	mov x9, x17
-	lsr x10, x15, L3_SHIFT
+	mov x6, x16			// L3 start
+	ldr x7, =SECT_ATTR_NORMAL	// attr
+	mov x8, x17			// VA: 0x40000000
+	mov x9, x17			// PA: 0x40000000
+	lsr x10, x15, L3_SHIFT		// entry count: image size
 	bl  build_l3_pagetable
 
 	/* 4th: Link this L3 pagetable to L2 entry */
