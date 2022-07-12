@@ -83,13 +83,15 @@
 /* TCR_EL1 - Translation Control Register */
 #define TCR_ASID_16	(1 << 36)
 
+#define TCR_IPS_MASK	0x7
 #define TCR_IPS_SHIFT	32
-#define TCR_IPS_32BIT	(0 << TCR_IPS_SHIFT)
-#define TCR_IPS_36BIT	(1 << TCR_IPS_SHIFT)
-#define TCR_IPS_40BIT	(2 << TCR_IPS_SHIFT)
-#define TCR_IPS_42BIT	(3 << TCR_IPS_SHIFT)
-#define TCR_IPS_44BIT	(4 << TCR_IPS_SHIFT)
-#define TCR_IPS_48BIT	(5 << TCR_IPS_SHIFT)
+#define TCR_IPS_32BIT	(__AC(0 , UL) << TCR_IPS_SHIFT)
+#define TCR_IPS_36BIT	(__AC(1 , UL) << TCR_IPS_SHIFT)
+#define TCR_IPS_40BIT	(__AC(2 , UL) << TCR_IPS_SHIFT)
+#define TCR_IPS_42BIT	(__AC(3 , UL) << TCR_IPS_SHIFT)
+#define TCR_IPS_44BIT	(__AC(4 , UL) << TCR_IPS_SHIFT)
+#define TCR_IPS_48BIT	(__AC(5 , UL) << TCR_IPS_SHIFT)
+#define TCR_IPS_52BIT	(__AC(6 , UL) << TCR_IPS_SHIFT)
 
 #define TCR_TG1_SHIFT	30
 #define TCR_TG1_16K	(1 << TCR_TG1_SHIFT)
@@ -121,6 +123,7 @@
 
 #define TCR_T1SZ_SHIFT	16
 #define TCR_T0SZ_SHIFT	0
+#define TCR_T0SZ_MASK	0x1f
 #define TCR_T1SZ(x)	((x) << TCR_T1SZ_SHIFT)
 #define TCR_T0SZ(x)	((x) << TCR_T0SZ_SHIFT)
 #define TCR_TxSZ(x)	(TCR_T1SZ(x) | TCR_T0SZ(x))
@@ -130,8 +133,14 @@
  * as PA_BITS. We can get PA_BITS from ID_AA64MMFR0_EL1.PARange.
  * So the TxSZ will be calculate dynamically.
  */
+#ifdef CONFIG_PAGING
+#define TCR_INIT_FLAGS	(TCR_ASID_16 | TCR_TG0_4K | \
+			TCR_EL1_EPD1_BIT | \
+			TCR_CACHE_ATTRS | TCR_SMP_ATTRS)
+#else
 #define TCR_INIT_FLAGS	(TCR_ASID_16 | TCR_TG0_4K | \
 			TCR_CACHE_ATTRS | TCR_SMP_ATTRS)
+#endif /* CONFIG_PAGING */
 
 /* SCTLR_EL1 - System Control Register */
 #define SCTLR_M		(_AC(1, UL) << 0)	/* MMU enable */
@@ -307,6 +316,10 @@
 		(SECT_ATTR_DEFAULT | ATTR_XN | \
 		ATTR_IDX(DEVICE_nGnRnE))
 
+/**************************************************************************
+ * AArch64 System Register Definitions
+ *************************************************************************/
+
 /*
  * ESR_EL1 - Exception Syndrome Register
  */
@@ -405,5 +418,70 @@
 #define ESR_ISS_ABRT_FSC_UNSUP_ATOM		0x31
 #define ESR_ISS_ABRT_FSC_LOCKDOWN		0x34
 #define ESR_ISS_ABRT_FSC_UNSUP_EXCL		0x35
+
+/* ID_AA64MMFR0_EL1 - Memory Model Feature Register 1 */
+#define ID_AA64MMFR0_EL1_PARANGE_SHIFT	_AC(0, U)
+#define ID_AA64MMFR0_EL1_PARANGE_MASK	_AC(0xf, ULL)
+
+#define PARANGE_0000	_AC(32, U)
+#define PARANGE_0001	_AC(36, U)
+#define PARANGE_0010	_AC(40, U)
+#define PARANGE_0011	_AC(42, U)
+#define PARANGE_0100	_AC(44, U)
+#define PARANGE_0101	_AC(48, U)
+#define PARANGE_0110	_AC(52, U)
+
+#define ID_AA64MMFR0_EL1_ECV_SHIFT		_AC(60, U)
+#define ID_AA64MMFR0_EL1_ECV_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_ECV_NOT_SUPPORTED	_AC(0x0, ULL)
+#define ID_AA64MMFR0_EL1_ECV_SUPPORTED		_AC(0x1, ULL)
+#define ID_AA64MMFR0_EL1_ECV_SELF_SYNCH	_AC(0x2, ULL)
+
+#define ID_AA64MMFR0_EL1_FGT_SHIFT		_AC(56, U)
+#define ID_AA64MMFR0_EL1_FGT_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_FGT_SUPPORTED		_AC(0x1, ULL)
+#define ID_AA64MMFR0_EL1_FGT_NOT_SUPPORTED	_AC(0x0, ULL)
+
+#define ID_AA64MMFR0_EL1_TGRAN4_SHIFT		_AC(28, U)
+#define ID_AA64MMFR0_EL1_TGRAN4_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN4_SUPPORTED	_AC(0x0, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN4_NOT_SUPPORTED	_AC(0xf, ULL)
+
+#define ID_AA64MMFR0_EL1_TGRAN64_SHIFT		_AC(24, U)
+#define ID_AA64MMFR0_EL1_TGRAN64_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN64_SUPPORTED	_AC(0x0, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN64_NOT_SUPPORTED	_AC(0xf, ULL)
+
+#define ID_AA64MMFR0_EL1_TGRAN16_SHIFT		_AC(20, U)
+#define ID_AA64MMFR0_EL1_TGRAN16_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN16_SUPPORTED	_AC(0x1, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN16_NOT_SUPPORTED	_AC(0x0, ULL)
+
+/* ID_AA64MMFR2_EL1 - Memory Model Feature Register 2 */
+#define ID_AA64MMFR2_EL1		S3_0_C0_C7_2
+
+#define ID_AA64MMFR2_EL1_ST_SHIFT	_AC(28, U)
+#define ID_AA64MMFR2_EL1_ST_MASK	_AC(0xf, ULL)
+
+#define ID_AA64MMFR2_EL1_CCIDX_SHIFT	_AC(20, U)
+#define ID_AA64MMFR2_EL1_CCIDX_MASK	_AC(0xf, ULL)
+#define ID_AA64MMFR2_EL1_CCIDX_LENGTH	_AC(4, U)
+
+#define ID_AA64MMFR2_EL1_CNP_SHIFT	_AC(0, U)
+#define ID_AA64MMFR2_EL1_CNP_MASK	_AC(0xf, ULL)
+
+/* TCR_EL1 - Translation Control Register */
+#define TCR_EL1_DS_SHIFT	59
+#define TCR_EL1_DS_BIT		(_AC(1, UL) << TCR_EL1_DS_SHIFT)
+#define TCR_EL1_TG0_SHIFT	14
+#define TCR_EL1_TG0_MASK	(_AC(3, UL) << TCR_EL1_TG0_SHIFT)
+#define TCR_EL1_EPD0_SHIFT	7
+#define TCR_EL1_EPD0_BIT	(_AC(1, UL) << TCR_EL1_EPD0_SHIFT)
+#define TCR_EL1_EPD1_SHIFT	23
+#define TCR_EL1_EPD1_BIT	(_AC(1, UL) << TCR_EL1_EPD1_SHIFT)
+
+#define TCR_EL1_TG0_4K		0
+#define TCR_EL1_TG0_64K		1
+#define TCR_EL1_TG0_16K		2
 
 #endif /* __CPU_ARM_64_DEFS_H__ */

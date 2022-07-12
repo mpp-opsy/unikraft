@@ -205,6 +205,27 @@ enocmdl:
 	uk_pr_info("No command line found\n");
 }
 
+#ifdef CONFIG_PAGING
+int init_paging(void)
+{
+	/* TODO define start, len */
+#if 0
+	rc = ukplat_pt_init(&kernel_pt, start, len);
+	if (unlikely(rc))
+		return rc;
+
+#endif
+#if 0
+	/* TODO add memory */
+
+	/* Switch to new page table */
+	rc = ukplat_pt_set_active(&kernel_pt);
+	if (unlikely(rc))
+		return rc;
+#endif
+}
+#endif /* CONFIG_PAGING */
+
 void __no_pauth _libkvmplat_start(void *dtb_pointer)
 {
 	int ret;
@@ -223,6 +244,13 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 
 	/* Initialize memory from DTB */
 	_init_dtb_mem();
+
+#ifdef CONFIG_PAGING
+	/* Initialize paging */
+	ret = init_paging();
+	if (unlikely(ret))
+		UK_CRASH("Could not initialize paging (%d)\n", ret);
+#endif
 
 #ifdef CONFIG_RTC_PL031
 	/* Initialize RTC */
