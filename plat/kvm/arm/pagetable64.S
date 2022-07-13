@@ -126,7 +126,12 @@
 aarch64_bpt_l0_pt0:
        pte_tbl_desc    aarch64_bpt_l1_pt0
        pte_tbl_desc    aarch64_bpt_l1_pt1
-       pte_zero        , 510
+       pte_zero        , 509
+#ifdef CONFIG_PAGING
+	pte_tbl_desc	aarch64_bpt_l1_pt511
+#else
+	pte_zero 	, 1
+#endif /* CONFIG_PAGING */
 
 /* L1: 0 - 512GiB (1GiB / entry)
  * 0x0000000000000000 - 0x000000003fffffff	Table descriptor to 1st L2 table
@@ -147,6 +152,14 @@ aarch64_bpt_l1_pt0:
 .align 12
 aarch64_bpt_l1_pt1:
        pte_fill        0x0000008000000000, 2, 512, SECT_ATTR_DEVICE_nGnRE
+
+#ifdef CONFIG_PAGING
+/* L1: 255.5 TiB - 2TiB (1GiB / entry)
+ * 0x0000ff8000000000 - 0x0000ffffffffffff	Direct-mapped
+ */
+aarch64_bpt_l1_pt511:
+	pte_fill	0x0000000000000000, 2, 512, SECT_ATTR_NORMAL
+#endif /* CONFIG_PAGING */
 
 /* L2: 0 - 1GiB (2MiB / entry)
  * 0x0000000000000000 - 0x0000000007ffffff	Hole:   @ 0
@@ -173,7 +186,6 @@ aarch64_bpt_l2_pt1:
 aarch64_bpt_l3_pt0:
        pte_fill        0x0000000040000000, 0, 512, SECT_ATTR_NORMAL_RWX
 
-/* TODO Add direct-mapped table */
 
 /* FIXME:
  * - This does not fit images >2MiB (should be OK)
