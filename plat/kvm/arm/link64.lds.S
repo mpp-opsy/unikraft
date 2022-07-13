@@ -61,6 +61,7 @@ SECTIONS {
 	_text = .;
 	.text :
 	{
+		*(.text._entry)
 		*(.text)
 		*(.text.*)
 	}

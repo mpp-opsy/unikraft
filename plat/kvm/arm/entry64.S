@@ -41,6 +41,7 @@
  * x0 - FDT pointer
  */
 
+.section .text._entry
 ENTRY(_libkvmplat_entry)
 
 	ldr x25, =_dtb
