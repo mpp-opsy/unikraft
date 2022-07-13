@@ -33,9 +33,160 @@
  * $FreeBSD$
  */
 #include <uk/arch/limits.h>
+#include <uk/arch/paging.h>
 #include <uk/asm.h>
 #include <kvm-arm/mm.h>
 #include <arm/cpu_defs.h>
+
+/* FIXME */
+#define PTE_TYPE_BLOCK 0b01
+#define PTE_TYPE_TABLE 0b11
+#define PTE_TYPE_PAGE 0b11
+
+/* Unikraft to VMSAv8-A */
+#define PT_LVL_3	0
+#define PT_LVL_2	1
+#define PT_LVL_1	2
+#define PT_LVL_0	3
+
+/**
+ * Outputs a single PTE
+ *
+ * @param upper_attr upper attribute bits
+ * @param paddr physical address
+ * @param lower_attr lower attribute bits
+ */
+.macro pte_tbl_desc paddr
+       .quad \paddr + PTE_TYPE_TABLE
+.endm
+
+/* FIXME Can be reduced to 
+ *
+ * .quad (\attr_upper << 50) | (\paddr << (some_macro)) | \attr_lower | PTE_TYPE_???
+ */
+.macro pte_mapping paddr, attr
+.quad \paddr + \attr
+.endm
+
+/* Outputs a number of block / table descriptors for a contiguous mapping starting at
+ * the provided physical address.
+ */
+.macro pte_fill paddr, lvl, pages, attr
+.ifle \pages
+       .exitm
+.endif
+	pte_mapping (\paddr + PAGE_Lx_SIZE(\lvl) * 0), \attr
+.ifgt (\pages - 8)
+	/* Have to do some unrolling to not exceed max nested macros */
+	pte_mapping (\paddr + PAGE_Lx_SIZE(\lvl) * 1), \attr
+	pte_mapping (\paddr + PAGE_Lx_SIZE(\lvl) * 2), \attr
+	pte_mapping (\paddr + PAGE_Lx_SIZE(\lvl) * 3), \attr
+	pte_mapping (\paddr + PAGE_Lx_SIZE(\lvl) * 4), \attr
+	pte_mapping (\paddr + PAGE_Lx_SIZE(\lvl) * 5), \attr
+	pte_mapping (\paddr + PAGE_Lx_SIZE(\lvl) * 6), \attr
+	pte_mapping (\paddr + PAGE_Lx_SIZE(\lvl) * 7), \attr
+	pte_fill    (\paddr + PAGE_Lx_SIZE(\lvl) * 8), \lvl, (\pages - 8), \attr
+.else
+	pte_fill (\paddr + PAGE_Lx_SIZE(\lvl) * 1), \lvl, (\pages - 1), \attr
+.endif
+.endm
+
+/* Outputs a number of invalid PTEs
+ *
+ * @param paddr physical address (not used)
+ * @param pages number of PTEs
+ */
+.macro pte_zero paddr=0, pages
+       .fill \pages, 0x8, 0
+.endm
+
+/* KVM memory map (QEMU virt):
+ *
+ * 0x0000000000000000 - 0x0000000007ffffff	Hole:          0    - 128MiB
+ * 0x0000000008000000 - 0x000000003fffffff	Devices:     128MiB -   1GiB
+ * 0x0000000040000000 - 0x0000007fffffffff	Kernel:        1GiB - 512GiB
+ * 0x0000008000000000 - 0x000000ffffffffff	PCIe hi mem: 512GiB -   1TiB
+ */
+
+#if 0
+.global aarch64_bpt_l0_pt0
+.global aarch64_bpt_l1_pt0
+.global aarch64_bpt_l1_pt1
+.global aarch64_bpt_l2_pt0
+.global aarch64_bpt_l2_pt1
+.global aarch64_bpt_l3_pt0
+#endif
+
+.section .data
+
+/* L0: 0 - 2TiB
+ *
+ */
+.align 12
+aarch64_bpt_l0_pt0:
+       pte_tbl_desc    aarch64_bpt_l1_pt0
+       pte_tbl_desc    aarch64_bpt_l1_pt1
+       pte_zero        , 510
+
+/* L1: 0 - 512GiB (1GiB / entry)
+ * 0x0000000000000000 - 0x000000003fffffff	Table descriptor to 1st L2 table
+ * 0x0000000040000000 - 0x000000007fffffff	Table descriptor to 2nd L2 table
+ * 0x0000000080000000 - 0x000000003fffffff	RAM       @   2GiB
+ * 0x0000000400000000 - 0x0000007fffffffff	PCIe ECAM @ 256GiB
+ */
+.align 12
+aarch64_bpt_l1_pt0:
+       pte_tbl_desc    aarch64_bpt_l2_pt0
+       pte_tbl_desc    aarch64_bpt_l2_pt1
+       pte_fill        0x0000000080000000, 2, 254, SECT_ATTR_NORMAL
+       pte_fill        0x0000004000000000, 2, 256, SECT_ATTR_DEVICE_nGnRnE
+
+/* L1: 512GiB - 1TiB (1GiB / entry)
+ * 0x0000008000000000 - 0x000000ffffffffff	PCIe hi-mem @ 512GiB
+ */
+.align 12
+aarch64_bpt_l1_pt1:
+       pte_fill        0x0000008000000000, 2, 512, SECT_ATTR_DEVICE_nGnRE
+
+/* L2: 0 - 1GiB (2MiB / entry)
+ * 0x0000000000000000 - 0x0000000007ffffff	Hole:   @ 0
+ * 0x0000000008000000 - 0x000000003fffffff	Devices @ 128MiB
+ */
+.align 12
+aarch64_bpt_l2_pt0:
+       pte_zero        0x0000000000000000, 64
+       pte_fill        0x0000000008000000, 1, 448, SECT_ATTR_DEVICE_nGnRE
+
+/* L2: 1GiB - 2GiB (2MiB per entry)
+ * 0x0000000000000000 - 0x00000000001fffff	Table descriptor to 1st L3 table
+ * 0x0000000000200000 - 0x0000000000000000	RAM	@ 1.2GiB - 2GiB
+ */
+.align 12
+aarch64_bpt_l2_pt1:
+       pte_tbl_desc  aarch64_bpt_l3_pt0
+       pte_fill      0x0000000040200000, 1, 511, SECT_ATTR_NORMAL
+
+/* L3: 1GiB - 1.2GiB (4KiB / entry)
+ * 0x0000000040000000 - 0x0000007fffffffff	Kernel:        1GiB - 512GiB
+ */
+.align 12
+aarch64_bpt_l3_pt0:
+       pte_fill        0x0000000040000000, 0, 512, SECT_ATTR_NORMAL_RWX
+
+/* TODO Add direct-mapped table */
+
+/* FIXME:
+ * - This does not fit images >2MiB (should be OK)
+ *   On boot: 1st 2MiB of the image will be mapped in 4KiB, the rest in 2MiB pages.
+ *   This is a problem for permissions (we need to also get the image to be managed by paging)
+ *   If that worked, the image mappings > 1MiB would be mapped into newly created PTs.
+ *
+ * TODO:
+ * - Set permissions upon entry
+ * - Then enable WXN
+ */
+
+.text
 /*
  * The following is the Memory Layout of AArch64 Virtual Machine
  * | 0-0x7FFFFFF | 0x8000000-0x3FFFFFFF | 0x40000000-0x7FFFFFFFFF | 512GB-1TB |
@@ -64,171 +215,6 @@
 virt_bits:
 	.byte 32, 36, 40, 42, 44, 48
 
-/*
- * We will use a direct map for physical address and virtual address
- * (PA = VA 1:1 mapping)
- *  x15 = image size (trashed)
- */
-ENTRY(create_pagetables)
-	/* Save link address */
-	mov x5, x30
-
-	/* Pagetable starts from _end */
-	ldr x14, =_end
-
-	/*
-	 * We have 2 L1 tables to map 0 ~ 512GB, 512 GB ~ 1TB.
-	 * Link these two tables to L0 entries#0, #1
-	 */
-	mov x6, x14
-	mov x8, #0
-	add x9, x14, #L1_TABLE_OFFSET
-	mov x10, #2
-	bl  link_l0_pagetable
-
-	/*
-	 * Using 1GiB block to map the hole memory (0x0 ~ 0x7ffffff) and device
-	 * address space (0x8000000 ~ 0x3fffffff)
-	 */
-	/* Build a L2 block pagetable */
-	add x6, x14, #L2_TABLE_OFFSET
-	ldr x7, =0 /* NONE ATTR*/
-	mov x8, #HOLE_START
-	mov x9, x8
-	ldr x10, =HOLE_MEM_ENTRIES
-	bl  build_l2_block_pagetable
-
-	add x6, x14, #L2_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_DEVICE_nGnRE
-	mov x8, #DEVICE_ADDR_START
-	mov x9, x8
-	ldr x10, =DEVICE_ENTRIES
-	bl  build_l2_block_pagetable
-
-	/* Link this L2 block pagetable to L1 entry */
-	add x6, x14, #L1_TABLE_OFFSET
-	mov x8, #HOLE_START
-	add x9, x14, #L2_TABLE_OFFSET
-	bl  link_l1_pagetable
-
-	/*
-	 * Using 1GiB block to map RAM address space
-	 * (0x40000000 ~ (256GiB -1)). The RAM areas that contain kernel
-	 * sections will be update later.
-	 */
-	add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
-	ldr x7, =SECT_ATTR_NORMAL
-	mov x8, #RAM_ADDR_START
-	mov x9, x8
-	mov x10, #RAM_L2_ENTRIES
-	bl  build_l1_block_pagetable
-
-        /*
-         * Using 1GiB block to map PCIe ECAM address space
-         * (256GiB ~ 512GiB).
-         */
-        add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
-        ldr x7, =SECT_ATTR_DEVICE_nGnRnE
-        mov x8, #PCIE_ECAM_START
-        mov x9, x8
-        mov x10, #PCIE_ECAM_L2_ENTRIES
-        bl  build_l1_block_pagetable
-
-	/*
-	 * Using 1GiB block to map high PCIe address space
-	 * (0x512GiB ~ (1TiB -1)).
-	 */
-	add x6, x14, #L1_TABLE_OFFSET
-	add x6, x6, #__PAGE_SIZE	/* 2nd L2 table page */
-	ldr x7, =SECT_ATTR_DEVICE_nGnRE
-	mov x8, #PCIE_ADDR_START
-	mov x9, x8
-	mov x10, #PCIE_L2_ENTRIES
-	bl  build_l1_block_pagetable
-
-	/*
-	 * The text, bss, data and other sections are placed at
-	 * 0x40000000 ~ 0x7fffffff. We use 4k granularity to manage
-	 * their attributes to improve security.
-	 * L1 -> L2 -> L3 (4K)
-	 */
-	/* 1st: Build a L2 block pagetable */
-	add x6, x14, #L2_TABLE_OFFSET
-	add x6, x6, #__PAGE_SIZE
-	ldr x7, =SECT_ATTR_NORMAL
-	mov x8, #RAM_ADDR_START
-	mov x9, x8
-	mov x10, 512
-	bl  build_l2_block_pagetable
-
-	/* 2nd: Link this L2 block pagetable to L1 entry */
-	add x6, x14, #L1_TABLE_OFFSET
-	mov x8, #RAM_ADDR_START
-	add x9, x14, #L2_TABLE_OFFSET
-	add x9, x9, #__PAGE_SIZE
-	bl  link_l1_pagetable
-
-	/* 3rd: Build a L3 pagetable for image occupied memory */
-	add x16, x14, #L3_TABLE_OFFSET
-	mov x17, #RAM_ADDR_START
-
-	mov x6, x16
-	ldr x7, =SECT_ATTR_NORMAL
-	mov x8, x17
-	mov x9, x17
-	lsr x10, x15, L3_SHIFT
-	bl  build_l3_pagetable
-
-	/* 4th: Link this L3 pagetable to L2 entry */
-	add x6, x14, #L2_TABLE_OFFSET
-	add x6, x6, #__PAGE_SIZE
-1:
-	mov x8, x17
-	mov x9, x16
-	bl  link_l2_pagetable
-
-	/* Check whether the image mapping has been done */
-	add x16, x16, #__PAGE_SIZE
-	add x17, x17, #L2_SIZE
-	sub x15, x15, #L2_SIZE
-	cbnz x15, 1b
-
-	/* 5th: Update dtb section to readonly */
-	ldr x8, =_dtb
-	ldr x9, =_text
-	sub x10, x9, x8
-	add x6, x14, #L3_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_NORMAL_RO
-	mov x9, x8
-	lsr x10, x10, L3_SHIFT
-	bl  build_l3_pagetable
-
-	/* 6th: Update text section to Readonly & EXEC*/
-	ldr x8, =_text
-	ldr x9, =_etext
-	sub x10, x9, x8
-	add x6, x14, #L3_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_NORMAL_EXEC
-	mov x9, x8
-	lsr x10, x10, L3_SHIFT
-	bl  build_l3_pagetable
-
-	/* 7th: Update rodata and Constructor tables sections to Readonly */
-	ldr x8, =_rodata
-	ldr x9, =_ectors
-	sub x10, x9, x8
-	add x6, x14, #L3_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_NORMAL_RO
-	mov x9, x8
-	lsr x10, x10, L3_SHIFT
-	bl  build_l3_pagetable
-
-	/* Restore the Link register */
-	mov x30, x5
-
-	ret
-END(create_pagetables)
-
 ENTRY(start_mmu)
 	/*
 	 * Using dsb here to guarantee the create_pagetables has
@@ -237,7 +223,7 @@ ENTRY(start_mmu)
 	dsb sy
 
 	/* Load ttbr0, pagetable starts from _end */
-	ldr x27, =_end
+	ldr x27, =aarch64_bpt_l0_pt0
 	msr ttbr0_el1, x27
 	isb
 
@@ -274,13 +260,10 @@ ENTRY(start_mmu)
         /*
 	 * Invalidate the D-Cache to avoid using invalid data that existed
 	 * in D-Cache. Invalidate ranges that may have been modified:
-	 * DATA, BSS, PAGETABLE and BOOTSTACK.
+	 * DATA, BSS, and BOOTSTACK.
 	 */
 	ldr x0, =_data
 	ldr x1, =_end
-	ldr x2, =page_table_size
-	ldr x2, [x2]
-	add x1, x2, x1
 	add x1, x1, #__STACK_SIZE
 	sub x1, x1, x0
 	bl clean_and_invalidate_dcache_range
@@ -300,214 +283,3 @@ ENTRY(start_mmu)
 	ret
 END(start_mmu)
 
-/*
- * Builds an L0 -> L1 table descriptor
- *
- * This is a link for a 512GiB block of memory with up to 1GiB regions mapped
- * within it by build_l1_block_pagetable.
- *
- *  x6  = L0 table
- *  x8  = Virtual Address
- *  x9  = L1 PA (trashed)
- *  x10 = Entry count
- *  x11, x12 and x13 are trashed
- */
-link_l0_pagetable:
-	/* Find the table index */
-	lsr x11, x8, #L0_SHIFT
-	and x11, x11, #L0_ADDR_MASK
-
-	/* Build the L0 block entry */
-	mov x12, #L0_TABLE
-
-	/* Only use the output address bits */
-	lsr x9, x9, #__PAGE_SHIFT
-1:	orr x13, x12, x9, lsl #__PAGE_SHIFT
-
-	/* Store the entry */
-	str x13, [x6, x11, lsl #3]
-
-	sub x10, x10, #1
-	add x11, x11, #1
-	add x9, x9, #1
-	cbnz x10, 1b
-
-	ret
-
-/*
- * Builds an L1 -> L2 table descriptor
- *
- * This is a link for a 1GiB block of memory with up to 2MiB regions mapped
- * within it by build_l2_block_pagetable.
- *
- *  x6  = L1 table
- *  x8  = Virtual Address
- *  x9  = L2 PA (trashed)
- *  x11, x12 and x13 are trashed
- */
-link_l1_pagetable:
-	/* Find the table index */
-	lsr x11, x8, #L1_SHIFT
-	and x11, x11, #Ln_ADDR_MASK
-
-	/* Build the L1 block entry */
-	mov x12, #L1_TABLE
-
-	/* Only use the output address bits */
-	lsr x9, x9, #__PAGE_SHIFT
-	orr x13, x12, x9, lsl #__PAGE_SHIFT
-
-	/* Store the entry */
-	str x13, [x6, x11, lsl #3]
-
-	ret
-
-/*
- * Builds count 1 GiB page table entry
- *  x6  = L1 table
- *  x7  = Memory attributes
- *  x8  = VA start
- *  x9  = PA start (trashed)
- *  x10 = Entry count
- *  x11, x12 and x13 are trashed
- */
-build_l1_block_pagetable:
-	/* Find the table index */
-	lsr x11, x8, #L1_SHIFT
-	and x11, x11, #Ln_ADDR_MASK
-
-	/* Build the L1 block entry */
-	mov x12, x7
-#ifdef CONFIG_UKPLAT_LCPU_MULTICORE
-	orr x12, x12, ATTR_SH(ATTR_SH_IS)
-#endif
-
-	/* Only use the output address bits */
-	lsr x9, x9, #L1_SHIFT
-
-	/* Set the physical address for this virtual address */
-1:	orr x13, x12, x9, lsl #L1_SHIFT
-
-	/* Store the entry */
-	str x13, [x6, x11, lsl #3]
-
-	sub x10, x10, #1
-	add x11, x11, #1
-	add x9, x9, #1
-	cbnz x10, 1b
-
-	ret
-
-/*
- * Builds count 2 MiB page table entry
- *  x6  = L2 table
- *  x7  = Memory attributes (trashed)
- *  x8  = VA start
- *  x9  = PA start (trashed)
- *  x10 = Entry count
- *  x11, x12 and x13 are trashed
- */
-build_l2_block_pagetable:
-	/* Find the table index */
-	lsr x11, x8, #L2_SHIFT
-	and x11, x11, #Ln_ADDR_MASK
-
-	/* Build the L2 block entry */
-	mov x12, x7
-#ifdef CONFIG_UKPLAT_LCPU_MULTICORE
-	orr x12, x12, ATTR_SH(ATTR_SH_IS)
-#endif
-
-	/* Only use the output address bits */
-	lsr x9, x9, #L2_SHIFT
-
-	/* Set the physical address for this virtual address */
-1:	orr x13, x12, x9, lsl #L2_SHIFT
-
-	/* Store the entry */
-	str x13, [x6, x11, lsl #3]
-
-	sub x10, x10, #1
-	add x11, x11, #1
-	add x9, x9, #1
-	cbnz x10, 1b
-
-	ret
-
-/*
- * Builds an L3 -> L2 table descriptor
- *
- * This is a link for a 2MiB block of memory with up to 4KiB regions mapped
- * within it by build_pte_pagetable.
- *
- *  x6  = L2 table
- *  x8  = Virtual Address
- *  x9  = L3 table PA (trashed)
- *  x11, x12 and x13 are trashed
- */
-link_l2_pagetable:
-	/* Find the table index */
-	lsr x11, x8, #L2_SHIFT
-	and x11, x11, #Ln_ADDR_MASK
-
-	/* Build the L2 block entry */
-	mov x12, #L2_TABLE
-
-	/* Only use the output address bits */
-	lsr x9, x9, #__PAGE_SHIFT
-	orr x13, x12, x9, lsl #__PAGE_SHIFT
-
-	/* Store the entry */
-	str x13, [x6, x11, lsl #3]
-
-	ret
-
-/*
- * Builds count 4 KiB page table entry
- *  x6  = L3 table
- *  x7  = Memory attributes (trashed)
- *  x8  = VA start
- *  x9  = PA start (trashed)
- *  x10 = Entry count
- *  x11, x12 and x13 are trashed
- */
-build_l3_pagetable:
-	/* Find the first L3 table to be updated */
-	lsr x11, x8, #L2_SHIFT
-	and x11, x11, #Ln_ADDR_MASK
-	lsl x11, x11, #L3_SHIFT
-	add x6, x11, x6
-
-	/* Find the first entry index in L3 table */
-	lsr x11, x8, #L3_SHIFT
-	and x11, x11, #Ln_ADDR_MASK
-
-	/* Build the L3 entry */
-	mov x12, x7
-	orr x12, x12, #L3_PAGE
-#ifdef CONFIG_UKPLAT_LCPU_MULTICORE
-	orr x12, x12, ATTR_SH(ATTR_SH_IS)
-#endif
-
-	/* Only use the output address bits */
-	lsr x9, x9, #L3_SHIFT
-
-	/* Set the physical address for this virtual address */
-1:	orr x13, x12, x9, lsl #L3_SHIFT
-
-	/* Store the entry */
-	str x13, [x6, x11, lsl #3]
-	add x11, x11, #1
-
-	/* Cross L3 Page? */
-	and x11, x11, #Ln_ADDR_MASK
-	cbnz x11, 2f
-
-	/* To next L3 table */
-	add x6, x6, #__PAGE_SIZE
-
-2:	add x9, x9, #1
-	sub x10, x10, #1
-	cbnz x10, 1b
-
-	ret

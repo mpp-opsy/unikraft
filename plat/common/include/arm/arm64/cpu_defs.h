@@ -244,6 +244,7 @@
 #define Ln_ADDR_MASK	(Ln_ENTRIES - 1)
 #define Ln_TABLE_MASK	((1 << 12) - 1)
 #define Ln_TABLE	0x3
+#define Ln_PAGE		0x3
 #define Ln_BLOCK	0x1
 
 /*
@@ -307,6 +308,9 @@
 		(SECT_ATTR_DEFAULT | ATTR_UXN | \
 		ATTR_AP_RW_BIT | ATTR_IDX(NORMAL_WB))
 #endif /* CONFIG_ARM64_FEAT_BTI */
+
+#define SECT_ATTR_NORMAL_RWX				\
+		(ATTR_DEFAULT | Ln_PAGE | ATTR_UXN | ATTR_IDX(NORMAL_WB))
 
 #define SECT_ATTR_DEVICE_nGnRE	\
 		(SECT_ATTR_DEFAULT | ATTR_XN | \

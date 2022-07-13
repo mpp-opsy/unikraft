@@ -151,12 +151,6 @@ static void _init_dtb_mem(void)
 		UK_CRASH("Fatal: Image outside of RAM\n");
 
 	max_addr = mem_base + mem_size;
-	_libkvmplat_cfg.pagetable.start = ALIGN_DOWN((uintptr_t)__END,
-						     __PAGE_SIZE);
-	_libkvmplat_cfg.pagetable.len   = ALIGN_UP(page_table_size,
-						   __PAGE_SIZE);
-	_libkvmplat_cfg.pagetable.end   = _libkvmplat_cfg.pagetable.start
-					  + _libkvmplat_cfg.pagetable.len;
 
 	/* AArch64 require stack be 16-bytes alignment by default */
 	_libkvmplat_cfg.bstack.end   = ALIGN_DOWN(max_addr,
@@ -166,7 +160,7 @@ static void _init_dtb_mem(void)
 	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.bstack.end
 				       - _libkvmplat_cfg.bstack.len;
 
-	_libkvmplat_cfg.heap.start = _libkvmplat_cfg.pagetable.end;
+	_libkvmplat_cfg.heap.start = ALIGN_DOWN((uintptr_t)__END, __PAGE_SIZE);
 	_libkvmplat_cfg.heap.end   = _libkvmplat_cfg.bstack.start;
 	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
 				     - _libkvmplat_cfg.heap.start;
@@ -213,8 +207,8 @@ int init_paging(void)
 	rc = ukplat_pt_init(&kernel_pt, start, len);
 	if (unlikely(rc))
 		return rc;
-
 #endif
+
 #if 0
 	/* TODO add memory */
 
@@ -273,8 +267,6 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 		UK_CRASH("SMP initialization failed: %d.\n", ret);
 #endif /* CONFIG_HAVE_SMP */
 
-	uk_pr_info("pagetable start: %p\n",
-		   (void *) _libkvmplat_cfg.pagetable.start);
 	uk_pr_info("     heap start: %p\n",
 		   (void *) _libkvmplat_cfg.heap.start);
 	uk_pr_info("      stack top: %p\n",
