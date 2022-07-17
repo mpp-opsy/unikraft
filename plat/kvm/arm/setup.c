@@ -34,6 +34,11 @@
 #include <arm/smccc.h>
 #include <uk/arch/limits.h>
 
+#ifdef CONFIG_PAGING
+#include <uk/plat/paging.h>
+#include <uk/falloc.h>
+#endif /* CONFIG_PAGING */
+
 struct kvmplat_config _libkvmplat_cfg = { 0 };
 
 #define MAX_CMDLINE_SIZE 1024
@@ -199,24 +204,96 @@ enocmdl:
 	uk_pr_info("No command line found\n");
 }
 
+void pt_dump(void) {
+	uint64_t *base;
+	uint64_t *pt[] = {
+		0x000000004013a000,
+		0x000000004013b000,
+		0x000000004013c000,
+		0x000000004013d000,
+		0x000000004013e000,
+		0x000000004013f000,
+		0x0000000040140000,
+		0x0000000040166000
+	};
+	for (int j = 0; j < sizeof(pt)/sizeof(uint64_t); j++) {
+		base = pt[j];
+		printf("\n");
+		printf("Dump table @ 0x%lx\n", base);
+		for (int i = 0; i < 512; i++) {
+			printf("[%03d] 0x%016lx: 0x%016lx\n", i, base + i, *(base + i));
+		}
+	}
+}
+
+/* Initial page table struct used for paging API to absorb statically defined
+ * startup page table.
+ */
+static struct uk_pagetable kernel_pt;
+
 #ifdef CONFIG_PAGING
-int init_paging(void)
+int _init_paging(void)
 {
-	/* TODO define start, len */
-#if 0
+	int rc;
+	uint64_t start;
+	uint64_t len;
+	unsigned long frames;
+	unsigned long offset;
+
+	/* Assign all available memory beyond the
+	 * kernel image to the frame allocator.
+	 */
+	start = _end;
+	len   = _libkvmplat_cfg.bstack.end - start;
+
 	rc = ukplat_pt_init(&kernel_pt, start, len);
 	if (unlikely(rc))
 		return rc;
-#endif
 
-#if 0
-	/* TODO add memory */
-
-	/* Switch to new page table */
+	/* Switch to the new page tables */
 	rc = ukplat_pt_set_active(&kernel_pt);
 	if (unlikely(rc))
 		return rc;
-#endif
+
+	/* Unmap all available memory */
+	rc = ukplat_page_unmap(&kernel_pt, start, len >> PAGE_SHIFT,
+			       PAGE_FLAG_KEEP_FRAMES);
+	if (unlikely(rc))
+		return rc;
+
+	/* Map the heap and the stack */
+	__sz free_memory, res_memory;
+	free_memory = len;
+	frames = free_memory >> PAGE_SHIFT;
+
+	res_memory = _libkvmplat_cfg.bstack.len;	/* boot stack */
+	res_memory += PT_PAGES(frames) << PAGE_SHIFT;	/* page tables */
+
+	/* Map the heap after the kernel image */
+	_libkvmplat_cfg.heap.start = _end;
+	_libkvmplat_cfg.heap.end   = _libkvmplat_cfg.heap.start + free_memory - res_memory;
+
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end -
+				     _libkvmplat_cfg.heap.start;
+
+	frames = _libkvmplat_cfg.heap.len >> PAGE_SHIFT;
+	rc = ukplat_page_map(&kernel_pt, _libkvmplat_cfg.heap.start,
+			     __PADDR_ANY, frames, PAGE_ATTR_PROT_RW, 0);
+	if (unlikely(rc))
+		return rc;
+
+	/* Map the stack right after the heap */
+	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
+	_libkvmplat_cfg.bstack.end   = _libkvmplat_cfg.heap.end +
+				       _libkvmplat_cfg.bstack.len;
+
+	frames = _libkvmplat_cfg.bstack.len >> PAGE_SHIFT;
+	rc = ukplat_page_map(&kernel_pt, _libkvmplat_cfg.bstack.start,
+			     __PADDR_ANY, frames, PAGE_ATTR_PROT_RW, 0);
+	if (unlikely(rc))
+		return rc;
+
+	return 0;
 }
 #endif /* CONFIG_PAGING */
 
@@ -241,7 +318,7 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 
 #ifdef CONFIG_PAGING
 	/* Initialize paging */
-	ret = init_paging();
+	ret = _init_paging();
 	if (unlikely(ret))
 		UK_CRASH("Could not initialize paging (%d)\n", ret);
 #endif
@@ -267,9 +344,9 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 		UK_CRASH("SMP initialization failed: %d.\n", ret);
 #endif /* CONFIG_HAVE_SMP */
 
-	uk_pr_info("     heap start: %p\n",
+	printf("     heap start: %p\n",
 		   (void *) _libkvmplat_cfg.heap.start);
-	uk_pr_info("      stack top: %p\n",
+	printf("      stack top: %p\n",
 		   (void *) _libkvmplat_cfg.bstack.start);
 
 	/*
