@@ -96,7 +96,7 @@ void enforce_w_xor_x(void)
 		else if (d.flags & UKPLAT_MEMRF_WRITABLE)
 			prot |= PAGE_ATTR_PROT_WRITE;
 
-		uk_pr_debug("Setting protections for %s: %"
+		printf("Setting protections for %s: %"
 			    __PRIvaddr " - %" __PRIvaddr " [R%c%c]\n",
 			    WXORX_REGION_NAME,
 			    (__vaddr_t)d.base,
@@ -108,7 +108,7 @@ void enforce_w_xor_x(void)
 					  (__vaddr_t)d.base, pages, prot, 0);
 
 		if (unlikely(rc)) {
-			uk_pr_err("Failed to set protections for %s: %"
+			printf("Failed to set protections for %s: %"
 				  __PRIvaddr " - %" __PRIvaddr " [R%c%c]: %d\n",
 				  WXORX_REGION_NAME,
 				  (__vaddr_t)d.base,
@@ -249,6 +249,19 @@ void ukplat_entry(int argc, char *argv[])
 
 #ifdef CONFIG_LIBUKBOOT_ENFORCE_W_XOR_X
 	enforce_w_xor_x();
+
+	#define SCTLR_WXN	(_AC(1, UL) << 19)	/* Write permission implies XN */
+	uint64_t reg;
+
+	__asm__ __volatile__("mrs %0, SCTLR_EL1"
+			: "=r" (reg));
+
+	reg |= SCTLR_WXN;
+
+	__asm__ __volatile__("msr SCTLR_EL1, %0\n"
+			     "isb"
+			: : "r" ((uint64_t)(reg)));
+
 #endif /* CONFIG_LIBUKBOOT_ENFORCE_W_XOR_X */
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
