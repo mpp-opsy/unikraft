@@ -96,9 +96,12 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 
 #define DECLARE_TRAP_EVENT(event)					\
 UK_EVENT(event);							\
-static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
-		unsigned long error_code) {				\
-	struct ukarch_trap_ctx ctx = {regs, trapnr, error_code, 0};	\
+static inline int _raise_event_##event(int trapnr, const char *str,	\
+				       struct __regs *regs,		\
+					unsigned long error_code) {	\
+	struct ukarch_trap_ctx ctx = {regs, trapnr, str, error_code,	\
+				      0, /* filled by handler */	\
+				      read_cr2()}; /* pf addr */	\
 	return uk_raise_event(event, &ctx);				\
 }
 
@@ -108,11 +111,11 @@ static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
 void do_##name(struct __regs *regs)					\
 {									\
 	int rc;								\
-	rc = _raise_event_##event(TRAP_##name, regs, 0);		\
+	rc = _raise_event_##event(TRAP_##name, str, regs, 0);		\
 	if (unlikely(rc < 0))						\
 		uk_pr_crit("trap handler returned error: %d\n", rc);	\
 									\
-	if (!rc)							\
+	if (rc == UK_EVENT_NOT_HANDLED)					\
 		do_unhandled_trap(TRAP_##name, str, regs, 0);		\
 }
 
@@ -120,11 +123,11 @@ void do_##name(struct __regs *regs)					\
 void do_##name(struct __regs *regs, unsigned long error_code)		\
 {									\
 	int rc;								\
-	rc = _raise_event_##event(TRAP_##name, regs, error_code);	\
+	rc = _raise_event_##event(TRAP_##name, str, regs, error_code);	\
 	if (unlikely(rc < 0))						\
 		uk_pr_crit("trap handler returned error: %d\n", rc);	\
 									\
-	if (!rc)							\
+	if (rc == UK_EVENT_NOT_HANDLED)					\
 		do_unhandled_trap(TRAP_##name, str, regs, error_code);	\
 }
 

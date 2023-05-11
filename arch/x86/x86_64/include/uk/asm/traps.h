@@ -43,9 +43,10 @@
 struct ukarch_trap_ctx {
 	struct __regs *regs;
 	int trapnr;
+	const char *str;
 	int error_code;
-
-	unsigned long fault_address; /* for page faults */
+	int uk_errno;
+	__vaddr_t fault_address; /* for page faults */
 };
 
 #endif /* !__ASSEMBLY__ */
