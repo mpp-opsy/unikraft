@@ -38,6 +38,7 @@
 
 #include <uk/plat/bootstrap.h>
 #include <uk/arch/lcpu.h>
+#include <uk/asm/crash.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
 #include <uk/config.h>
@@ -52,8 +53,7 @@ extern "C" {
 		if (unlikely(!(x))) {					\
 			uk_pr_crit("Assertion failure: %s\n",		\
 				   STRINGIFY(x));			\
-			/* TODO: stack trace */				\
-			ukplat_terminate(UKPLAT_CRASH);			\
+			ukarch_trigger_crash();				\
 		}							\
 	} while (0)
 
@@ -84,8 +84,7 @@ extern "C" {
 #define UK_CRASH(fmt, ...)						\
 	do {								\
 		uk_pr_crit((fmt), ##__VA_ARGS__);			\
-		/* TODO: stack trace */					\
-		ukplat_terminate(UKPLAT_CRASH);				\
+		ukarch_trigger_crash();					\
 	} while (0)
 
 #ifdef __cplusplus
