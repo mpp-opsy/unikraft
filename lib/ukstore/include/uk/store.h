@@ -97,7 +97,7 @@ typedef int (*uk_store_set_u64_func_t)(void *, __u64);
 typedef int (*uk_store_set_uptr_func_t)(void *, __uptr);
 typedef int (*uk_store_set_charp_func_t)(void *, const char *);
 
-struct uk_store_entry {
+struct uk_store_ops {
 	/* Function getter pointer */
 	union {
 		uk_store_get_s8_func_t     s8;
@@ -125,7 +125,9 @@ struct uk_store_entry {
 		uk_store_set_uptr_func_t  uptr;
 		uk_store_set_charp_func_t charp;
 	} set;
+};
 
+struct uk_store_entry {
 	/* The entry name */
 	char *name;
 
@@ -134,6 +136,9 @@ struct uk_store_entry {
 
 	/* Entry getter/setter type */
 	enum uk_store_entry_type type;
+
+	/* Entry ops */
+	struct uk_store_ops ops;
 } __align8;
 
 /* Flags if an entry is static or dynamic */
@@ -145,11 +150,11 @@ struct uk_store_entry {
 #define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
 	static const struct uk_store_entry				\
 	__unused __uk_store_entries_list ## _ ## entry = {		\
-		.name = STRINGIFY(entry),				\
-		.type       = (UK_STORE_ENTRY_TYPE(e_type)),		\
-		.get.e_type = (e_get),					\
-		.set.e_type = (e_set),					\
-		.flags      = UK_STORE_ENTRY_FLAG_STATIC		\
+		.name           = STRINGIFY(entry),			\
+		.type           = (UK_STORE_ENTRY_TYPE(e_type)),	\
+		.ops.get.e_type = (e_get),				\
+		.ops.set.e_type = (e_set),				\
+		.flags          = UK_STORE_ENTRY_FLAG_STATIC		\
 	}
 
 /* Do not call directly */
@@ -187,11 +192,11 @@ struct uk_store_entry {
 	static const struct uk_store_entry				\
 	__used __section(".uk_store_lib_" lib_str) __align8		\
 	__uk_store_entries_list ## _ ## entry = {			\
-		.name = STRINGIFY(entry),				\
-		.type       = (UK_STORE_ENTRY_TYPE(e_type)),		\
-		.get.e_type = (e_get),					\
-		.set.e_type = (e_set),					\
-		.flags      = UK_STORE_ENTRY_FLAG_STATIC		\
+		.name           = STRINGIFY(entry),			\
+		.type           = (UK_STORE_ENTRY_TYPE(e_type)),	\
+		.ops.get.e_type = (e_get),				\
+		.ops.set.e_type = (e_set),				\
+		.flags          = UK_STORE_ENTRY_FLAG_STATIC		\
 	}
 
 /* Do not call directly */

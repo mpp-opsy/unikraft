@@ -111,7 +111,7 @@ _uk_store_get_static_entry(__u16 libid, const char *e_name)
 		if (unlikely(var < 0 ||					\
 			var > (__ ## eparam) __ ## ETYPE ## _MAX))	\
 			return -ERANGE;					\
-		return (entry)->set.etype(cookie, (__ ## etype) var);	\
+		return (entry)->ops.set.etype(cookie, (__ ## etype) var);\
 	} while (0)
 
 /* Unsigned input, signed etype */
@@ -120,7 +120,7 @@ _uk_store_get_static_entry(__u16 libid, const char *e_name)
 		case UK_STORE_ENTRY_TYPE(etype):			\
 		if (unlikely(var > __ ## ETYPE ## _MAX))		\
 			return -ERANGE;					\
-		return (entry)->set.etype(cookie, (__ ## etype) var);	\
+		return (entry)->ops.set.etype(cookie, (__ ## etype) var);\
 	} while (0)
 
 /* Both signed */
@@ -130,7 +130,7 @@ _uk_store_get_static_entry(__u16 libid, const char *e_name)
 		if (unlikely(var < __ ## ETYPE ## _MIN ||		\
 				var > __ ## ETYPE ## _MAX))		\
 			return -ERANGE;					\
-		return (entry)->set.etype(cookie, (__ ## etype) var);	\
+		return (entry)->ops.set.etype(cookie, (__ ## etype) var);\
 	} while (0)
 
 /* Both unsigned */
@@ -139,7 +139,7 @@ _uk_store_get_static_entry(__u16 libid, const char *e_name)
 		case UK_STORE_ENTRY_TYPE(etype):			\
 		if (unlikely(var > __ ## ETYPE ## _MAX))		\
 			return -ERANGE;					\
-		return (entry)->set.etype(cookie, (__ ## etype) var);	\
+		return (entry)->ops.set.etype(cookie, (__ ## etype) var);\
 	} while (0)
 
 /* Signed input, unsigned etype */
@@ -148,7 +148,7 @@ _uk_store_get_static_entry(__u16 libid, const char *e_name)
 		case UK_STORE_ENTRY_TYPE(etype):			\
 		if (unlikely(var < 0))					\
 			return -ERANGE;					\
-		return (entry)->set.etype(cookie, (__ ## etype) var);	\
+		return (entry)->ops.set.etype(cookie, (__ ## etype) var);\
 	} while (0)
 
 /* All other cases */
@@ -156,7 +156,7 @@ _uk_store_get_static_entry(__u16 libid, const char *e_name)
 	do {								\
 		case UK_STORE_ENTRY_TYPE(etype):			\
 		;							\
-		return (entry)->set.etype(cookie, (__ ## etype) var);	\
+		return (entry)->ops.set.etype(cookie, (__ ## etype) var);\
 	} while (0)
 
 /**
@@ -174,7 +174,7 @@ _uk_store_set_u8(const struct uk_store_entry *e, __u8 val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -193,7 +193,7 @@ _uk_store_set_u8(const struct uk_store_entry *e, __u8 val)
 		char to_set[_U8_STRLEN];
 
 		snprintf(to_set, _U8_STRLEN, "%" __PRIu8, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -209,7 +209,7 @@ _uk_store_set_s8(const struct uk_store_entry *e, __s8 val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -228,7 +228,7 @@ _uk_store_set_s8(const struct uk_store_entry *e, __s8 val)
 		char to_set[_S8_STRLEN];
 
 		snprintf(to_set, _S8_STRLEN, "%" __PRIs8, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -244,7 +244,7 @@ _uk_store_set_u16(const struct uk_store_entry *e, __u16 val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -262,7 +262,7 @@ _uk_store_set_u16(const struct uk_store_entry *e, __u16 val)
 		char to_set[_U16_STRLEN];
 
 		snprintf(to_set, _U16_STRLEN, "%" __PRIu16, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -278,7 +278,7 @@ _uk_store_set_s16(const struct uk_store_entry *e, __s16 val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -297,7 +297,7 @@ _uk_store_set_s16(const struct uk_store_entry *e, __s16 val)
 		char to_set[_S16_STRLEN];
 
 		snprintf(to_set, _S16_STRLEN, "%" __PRIs16, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -313,7 +313,7 @@ _uk_store_set_u32(const struct uk_store_entry *e, __u32 val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -332,7 +332,7 @@ _uk_store_set_u32(const struct uk_store_entry *e, __u32 val)
 		char to_set[_U32_STRLEN];
 
 		snprintf(to_set, _U32_STRLEN, "%" __PRIu32, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -348,7 +348,7 @@ _uk_store_set_s32(const struct uk_store_entry *e, __s32 val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -367,7 +367,7 @@ _uk_store_set_s32(const struct uk_store_entry *e, __s32 val)
 		char to_set[_S32_STRLEN];
 
 		snprintf(to_set, _S32_STRLEN, "%" __PRIs32, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -383,7 +383,7 @@ _uk_store_set_u64(const struct uk_store_entry *e, __u64 val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -402,7 +402,7 @@ _uk_store_set_u64(const struct uk_store_entry *e, __u64 val)
 		char to_set[_U64_STRLEN];
 
 		snprintf(to_set, _U64_STRLEN, "%" __PRIu64, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -418,7 +418,7 @@ _uk_store_set_s64(const struct uk_store_entry *e, __s64 val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -437,7 +437,7 @@ _uk_store_set_s64(const struct uk_store_entry *e, __s64 val)
 		char to_set[_S64_STRLEN];
 
 		snprintf(to_set, _S64_STRLEN, "%" __PRIs64, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -453,7 +453,7 @@ _uk_store_set_uptr(const struct uk_store_entry *e, __uptr val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -472,7 +472,7 @@ _uk_store_set_uptr(const struct uk_store_entry *e, __uptr val)
 		char to_set[_UPTR_STRLEN];
 
 		snprintf(to_set, _UPTR_STRLEN, "0x%" __PRIx64, val);
-		ret = e->set.charp(cookie, to_set);
+		ret = e->ops.set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -489,7 +489,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->set.u8 == NULL))
+	if (unlikely(e->ops.set.u8 == NULL))
 		return -EIO;
 
 
@@ -501,7 +501,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.u8(cookie, to_set);
+		return e->ops.set.u8(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(s8): {
@@ -511,7 +511,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.s8(cookie, to_set);
+		return e->ops.set.s8(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(u16): {
@@ -521,7 +521,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.u16(cookie, to_set);
+		return e->ops.set.u16(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(s16): {
@@ -531,7 +531,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.s16(cookie, to_set);
+		return e->ops.set.s16(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(u32): {
@@ -541,7 +541,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.u32(cookie, to_set);
+		return e->ops.set.u32(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(s32): {
@@ -551,7 +551,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.s32(cookie, to_set);
+		return e->ops.set.s32(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(u64): {
@@ -561,7 +561,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.u64(cookie, to_set);
+		return e->ops.set.u64(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(s64): {
@@ -571,7 +571,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.s64(cookie, to_set);
+		return e->ops.set.s64(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(uptr): {
@@ -585,11 +585,11 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.uptr(cookie, to_set);
+		return e->ops.set.uptr(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(charp): {
-		ret = e->set.charp(cookie, val);
+		ret = e->ops.set.charp(cookie, val);
 
 		return ret;
 	}
@@ -615,7 +615,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype(cookie, &val);		\
+			ret = (entry)->ops.get.etype(cookie, &val);	\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val < 0 ||				\
@@ -632,7 +632,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype(cookie, &val);		\
+			ret = (entry)->ops.get.etype(cookie, &val);	\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val > __ ## PTYPE ## _MAX))	\
@@ -648,7 +648,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype(cookie, &val);		\
+			ret = (entry)->ops.get.etype(cookie, &val);	\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val < __ ## PTYPE ## _MIN		\
@@ -665,7 +665,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype(cookie, &val);		\
+			ret = (entry)->ops.get.etype(cookie, &val);	\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val > __ ## PTYPE ## _MAX))	\
@@ -681,7 +681,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype(cookie, &val);		\
+			ret = (entry)->ops.get.etype(cookie, &val);	\
 			if (ret < 0)					\
 				return ret;				\
 			*(var)  = (__ ## eparam) val;			\
@@ -695,7 +695,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype(cookie, &val);		\
+			ret = (entry)->ops.get.etype(cookie, &val);	\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val < 0))				\
@@ -721,7 +721,7 @@ _uk_store_get_u8(const struct uk_store_entry *e, __u8 *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -739,7 +739,7 @@ _uk_store_get_u8(const struct uk_store_entry *e, __u8 *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -762,7 +762,7 @@ _uk_store_get_s8(const struct uk_store_entry *e, __s8 *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -780,7 +780,7 @@ _uk_store_get_s8(const struct uk_store_entry *e, __s8 *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -803,7 +803,7 @@ _uk_store_get_u16(const struct uk_store_entry *e, __u16 *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -821,7 +821,7 @@ _uk_store_get_u16(const struct uk_store_entry *e, __u16 *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -844,7 +844,7 @@ _uk_store_get_s16(const struct uk_store_entry *e, __s16 *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -862,7 +862,7 @@ _uk_store_get_s16(const struct uk_store_entry *e, __s16 *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -885,7 +885,7 @@ _uk_store_get_u32(const struct uk_store_entry *e, __u32 *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -903,7 +903,7 @@ _uk_store_get_u32(const struct uk_store_entry *e, __u32 *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -926,7 +926,7 @@ _uk_store_get_s32(const struct uk_store_entry *e, __s32 *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -944,7 +944,7 @@ _uk_store_get_s32(const struct uk_store_entry *e, __s32 *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -967,7 +967,7 @@ _uk_store_get_u64(const struct uk_store_entry *e, __u64 *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -985,7 +985,7 @@ _uk_store_get_u64(const struct uk_store_entry *e, __u64 *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -1008,7 +1008,7 @@ _uk_store_get_s64(const struct uk_store_entry *e, __s64 *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -1026,7 +1026,7 @@ _uk_store_get_s64(const struct uk_store_entry *e, __s64 *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -1049,7 +1049,7 @@ _uk_store_get_uptr(const struct uk_store_entry *e, __uptr *out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -1067,7 +1067,7 @@ _uk_store_get_uptr(const struct uk_store_entry *e, __uptr *out)
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -1094,7 +1094,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	void *cookie = NULL;
 
 	UK_ASSERT(e);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
@@ -1105,7 +1105,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.u8(cookie, &val);
+		ret = e->ops.get.u8(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _U8_STRLEN, "%" __PRIu8, val);
@@ -1120,7 +1120,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.s8(cookie, &val);
+		ret = e->ops.get.s8(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _S8_STRLEN, "%" __PRIs8, val);
@@ -1135,7 +1135,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.u16(cookie, &val);
+		ret = e->ops.get.u16(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _U16_STRLEN, "%" __PRIu16, val);
@@ -1150,7 +1150,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.s16(cookie, &val);
+		ret = e->ops.get.s16(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _S16_STRLEN, "%" __PRIs16, val);
@@ -1165,7 +1165,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.u32(cookie, &val);
+		ret = e->ops.get.u32(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _U32_STRLEN, "%" __PRIu32, val);
@@ -1180,7 +1180,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.s32(cookie, &val);
+		ret = e->ops.get.s32(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _S32_STRLEN, "%" __PRIs32, val);
@@ -1195,7 +1195,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.u64(cookie, &val);
+		ret = e->ops.get.u64(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _U64_STRLEN, "%" __PRIu64, val);
@@ -1210,7 +1210,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.s64(cookie, &val);
+		ret = e->ops.get.s64(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _S64_STRLEN, "%" __PRIs64, val);
@@ -1225,7 +1225,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.uptr(cookie, &val);
+		ret = e->ops.get.uptr(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _UPTR_STRLEN, "0x%" __PRIx64, val);
@@ -1236,7 +1236,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 		*out  = val;
@@ -1257,14 +1257,14 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 
 	UK_ASSERT(e);
 	UK_ASSERT(out);
-	if (unlikely(e->get.u8 == NULL))
+	if (unlikely(e->ops.get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
 	case UK_STORE_ENTRY_TYPE(u8): {
 		__u8 val;
 
-		ret = e->get.u8(cookie, &val);
+		ret = e->ops.get.u8(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIu8, val);
@@ -1274,7 +1274,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(s8): {
 		__s8 val;
 
-		ret = e->get.s8(cookie, &val);
+		ret = e->ops.get.s8(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIs8, val);
@@ -1284,7 +1284,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(u16): {
 		__u16 val;
 
-		ret = e->get.u16(cookie, &val);
+		ret = e->ops.get.u16(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIu16, val);
@@ -1294,7 +1294,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(s16): {
 		__s16 val;
 
-		ret = e->get.s16(cookie, &val);
+		ret = e->ops.get.s16(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIs16, val);
@@ -1304,7 +1304,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(u32): {
 		__u32 val;
 
-		ret = e->get.u32(cookie, &val);
+		ret = e->ops.get.u32(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIu32, val);
@@ -1314,7 +1314,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(s32): {
 		__s32 val;
 
-		ret = e->get.s32(cookie, &val);
+		ret = e->ops.get.s32(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIs32, val);
@@ -1324,7 +1324,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(u64): {
 		__u64 val;
 
-		ret = e->get.u64(cookie, &val);
+		ret = e->ops.get.u64(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIu64, val);
@@ -1334,7 +1334,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(s64): {
 		__s64 val;
 
-		ret = e->get.s64(cookie, &val);
+		ret = e->ops.get.s64(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIs64, val);
@@ -1344,7 +1344,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(uptr): {
 		__uptr val;
 
-		ret = e->get.uptr(cookie, &val);
+		ret = e->ops.get.uptr(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "0x%" __PRIx64, val);
@@ -1354,7 +1354,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val;
 
-		ret = e->get.charp(cookie, &val);
+		ret = e->ops.get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 		strncpy(out, val, maxlen);
