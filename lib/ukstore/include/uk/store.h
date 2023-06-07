@@ -74,56 +74,56 @@ enum uk_store_entry_type {
 	(_LIB_UK_STORE_ENTRY_TYPE___ ## simple_type)
 
 /* Getter definitions */
-typedef int (*uk_store_get_s8_func_t)(void *, __s8 *);
-typedef int (*uk_store_get_u8_func_t)(void *, __u8 *);
-typedef int (*uk_store_get_s16_func_t)(void *, __s16 *);
-typedef int (*uk_store_get_u16_func_t)(void *, __u16 *);
-typedef int (*uk_store_get_s32_func_t)(void *, __s32 *);
-typedef int (*uk_store_get_u32_func_t)(void *, __u32 *);
-typedef int (*uk_store_get_s64_func_t)(void *, __s64 *);
-typedef int (*uk_store_get_u64_func_t)(void *, __u64 *);
-typedef int (*uk_store_get_uptr_func_t)(void *, __uptr *);
-typedef int (*uk_store_get_charp_func_t)(void *, char **);
+typedef int (*_uk_store_get_s8_func_t)(void *, __s8 *);
+typedef int (*_uk_store_get_u8_func_t)(void *, __u8 *);
+typedef int (*_uk_store_get_s16_func_t)(void *, __s16 *);
+typedef int (*_uk_store_get_u16_func_t)(void *, __u16 *);
+typedef int (*_uk_store_get_s32_func_t)(void *, __s32 *);
+typedef int (*_uk_store_get_u32_func_t)(void *, __u32 *);
+typedef int (*_uk_store_get_s64_func_t)(void *, __s64 *);
+typedef int (*_uk_store_get_u64_func_t)(void *, __u64 *);
+typedef int (*_uk_store_get_uptr_func_t)(void *, __uptr *);
+typedef int (*_uk_store_get_charp_func_t)(void *, char **);
 
 /* Setter definitions */
-typedef int (*uk_store_set_s8_func_t)(void *, __s8);
-typedef int (*uk_store_set_u8_func_t)(void *, __u8);
-typedef int (*uk_store_set_s16_func_t)(void *, __s16);
-typedef int (*uk_store_set_u16_func_t)(void *, __u16);
-typedef int (*uk_store_set_s32_func_t)(void *, __s32);
-typedef int (*uk_store_set_u32_func_t)(void *, __u32);
-typedef int (*uk_store_set_s64_func_t)(void *, __s64);
-typedef int (*uk_store_set_u64_func_t)(void *, __u64);
-typedef int (*uk_store_set_uptr_func_t)(void *, __uptr);
-typedef int (*uk_store_set_charp_func_t)(void *, const char *);
+typedef int (*_uk_store_set_s8_func_t)(void *, __s8);
+typedef int (*_uk_store_set_u8_func_t)(void *, __u8);
+typedef int (*_uk_store_set_s16_func_t)(void *, __s16);
+typedef int (*_uk_store_set_u16_func_t)(void *, __u16);
+typedef int (*_uk_store_set_s32_func_t)(void *, __s32);
+typedef int (*_uk_store_set_u32_func_t)(void *, __u32);
+typedef int (*_uk_store_set_s64_func_t)(void *, __s64);
+typedef int (*_uk_store_set_u64_func_t)(void *, __u64);
+typedef int (*_uk_store_set_uptr_func_t)(void *, __uptr);
+typedef int (*_uk_store_set_charp_func_t)(void *, const char *);
 
 struct uk_store_ops {
 	/* Function getter pointer */
 	union {
-		uk_store_get_s8_func_t     s8;
-		uk_store_get_u8_func_t     u8;
-		uk_store_get_s16_func_t    s16;
-		uk_store_get_u16_func_t    u16;
-		uk_store_get_s32_func_t    s32;
-		uk_store_get_u32_func_t    u32;
-		uk_store_get_s64_func_t    s64;
-		uk_store_get_u64_func_t    u64;
-		uk_store_get_uptr_func_t   uptr;
-		uk_store_get_charp_func_t  charp;
+		_uk_store_get_s8_func_t     s8;
+		_uk_store_get_u8_func_t     u8;
+		_uk_store_get_s16_func_t    s16;
+		_uk_store_get_u16_func_t    u16;
+		_uk_store_get_s32_func_t    s32;
+		_uk_store_get_u32_func_t    u32;
+		_uk_store_get_s64_func_t    s64;
+		_uk_store_get_u64_func_t    u64;
+		_uk_store_get_uptr_func_t   uptr;
+		_uk_store_get_charp_func_t  charp;
 	} get;
 
 	/* Function setter pointer */
 	union {
-		uk_store_set_s8_func_t    s8;
-		uk_store_set_u8_func_t    u8;
-		uk_store_set_s16_func_t   s16;
-		uk_store_set_u16_func_t   u16;
-		uk_store_set_s32_func_t   s32;
-		uk_store_set_u32_func_t   u32;
-		uk_store_set_s64_func_t   s64;
-		uk_store_set_u64_func_t   u64;
-		uk_store_set_uptr_func_t  uptr;
-		uk_store_set_charp_func_t charp;
+		_uk_store_set_s8_func_t    s8;
+		_uk_store_set_u8_func_t    u8;
+		_uk_store_set_s16_func_t   s16;
+		_uk_store_set_u16_func_t   u16;
+		_uk_store_set_s32_func_t   s32;
+		_uk_store_set_u32_func_t   u32;
+		_uk_store_set_s64_func_t   s64;
+		_uk_store_set_u64_func_t   u64;
+		_uk_store_set_uptr_func_t  uptr;
+		_uk_store_set_charp_func_t charp;
 	} set;
 };
 
