@@ -55,10 +55,6 @@
 #include <gic/gic-v2.h>
 #endif
 
-#if CONFIG_PAGING
-#include <uk/plat/paging.h>
-#endif /* CONFIG_PAGING */
-
 #if CONFIG_LIBUKMMIO
 #include <uk/mmio.h>
 #endif
@@ -408,130 +404,83 @@ static struct virtio_config_ops virtio_mmio_config_ops = {
 
 static int virtio_mmio_probe(struct pf_device *pfdev)
 {
-	#ifdef CONFIG_LIBUKMMIO
-	#ifdef CONFIG_ARCH_ARM_64
 	const fdt32_t *prop;
-	int type, hwirq, prop_len;
+	int prop_len;
 	int fdt_vm = pfdev->fdt_offset;
-	__u64 reg_base;
-	__u64 reg_size;
-	#else
-	struct uk_mmio_device *mmio_dev;
-	#endif
 	void *dtb;
 
-	#ifdef CONFIG_ARCH_ARM_64
 	dtb = (void *)ukplat_bootinfo_get()->dtb;
+
 	if (fdt_vm == -FDT_ERR_NOTFOUND) {
 		uk_pr_info("device not found in fdt\n");
 		goto error_exit;
-	} else {
-		prop = fdt_getprop(dtb, fdt_vm, "interrupts", &prop_len);
-		if (!prop) {
-			uk_pr_err("irq of device not found in fdt\n");
-			goto error_exit;
-		}
-
-		type = fdt32_to_cpu(prop[0]);
-		hwirq = fdt32_to_cpu(prop[1]);
-
-		prop = fdt_getprop(dtb, fdt_vm, "reg", &prop_len);
-		if (!prop) {
-			uk_pr_err("reg of device not found in fdt\n");
-			goto error_exit;
-		}
-
-		/* only care about base addr, ignore the size */
-		fdt_get_address(dtb, fdt_vm, 0, &reg_base, &reg_size);
 	}
 
-	pfdev->base = reg_base;
-	pfdev->irq = gic_irq_translate(type, hwirq);
-	#else
-
-	mmio_dev = uk_mmio_dev_get(0);
-
-	if (!mmio_dev) {
-		uk_pr_err("mmio device not found\n");
+	prop = fdt_getprop(dtb, fdt_vm, "interrupts", &prop_len);
+	if (!prop) {
+		uk_pr_err("irq of device not found in fdt\n");
 		goto error_exit;
 	}
-	pfdev->base = mmio_dev->base_addr;
-	pfdev->irq = mmio_dev->irq;
-	
-	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
-				pfdev->base, pfdev->irq);
-	#endif
-	#endif
-	
+
+	/* FIXME Use interrupt-cells
+	 *
+	 * interrupts[0]: SPI if zero, not SPI otherwise
+	 * interrupts[1]: IRQ number
+	 * interrupts[2]: 0: leave as is, 1: edge triggered, 2: level trigered
+	 */
+	UK_ASSERT(prop_len == 3 * sizeof(fdt32_t));
+
+	pfdev->irq_type = fdt32_to_cpu(prop[0]);
+	pfdev->irq = fdt32_to_cpu(prop[1]);
+	pfdev->irq_trigger = fdt32_to_cpu(prop[2]);
+
+	prop = fdt_getprop(dtb, fdt_vm, "reg", &prop_len);
+	if (!prop) {
+		uk_pr_err("reg of device not found in fdt\n");
+		goto error_exit;
+	}
+	fdt_get_address(dtb, fdt_vm, 0, &pfdev->base, &pfdev->size);
+
+	uk_pr_info("virtio mmio probe base(0x%lx) size(%ld)\n",
+		   pfdev->base, pfdev->size);
+	uk_pr_info("virtio mmio probe irq(%d) type(%d) trigger(%d)\n",
+		   pfdev->irq, pfdev->irq_type, pfdev->irq_trigger);
+
 	return 0;
-	
-#ifdef CONFIG_LIBUKMMIO
+
 error_exit:
 	return -EFAULT;
-#endif
 }
-
-#ifdef CONFIG_PAGING
-static int virtio_mmio_map_device(struct virtio_mmio_device *vmdev)
-{
-	int rc;
-	struct uk_pagetable *pt;
-	unsigned long attr;
-
-	attr = PAGE_ATTR_PROT_RW;
-#ifdef CONFIG_ARCH_ARM_64
-	attr |= PAGE_ATTR_TYPE_DEVICE_nGnRnE;
-#endif /* CONFIG_ARCH_ARM_64 */
-
-	pt = ukplat_pt_get_active();
-
-	/* 1:1 */
-	rc = ukplat_page_map(pt, vmdev->base, vmdev->base, 1, attr, 0);
-	if (!rc)
-		goto out;
-
-	/* If already mapped, we assume that the mapping is part of the
-	 * boot pagetables. Make sure the attributes are correct.
-	 */
-	if (rc == -EEXIST)
-		rc = ukplat_page_set_attr(pt, vmdev->base, 1, attr, 0);
-
-out:
-	return rc;
-}
-#endif /* CONFIG_PAGING */
 
 static int virtio_mmio_add_dev(struct pf_device *pfdev)
 {
 	struct virtio_mmio_device *vm_dev;
 	unsigned int magic;
-	int rc;
+	int rc = 0;
 
 	UK_ASSERT(pfdev != NULL);
 
 	vm_dev = uk_malloc(a, sizeof(*vm_dev));
-	if (!vm_dev) {
-		uk_pr_err("Failed to allocate virtio-mmio device\n");
-		rc = -ENOMEM;
-		goto free_vmdev;
-	}
+	if (unlikely(!vm_dev))
+		return -ENOMEM;
 
 	/* Fetch Pf Device information */
 	vm_dev->pfdev = pfdev;
-	vm_dev->base = (void *)pfdev->base;
 	vm_dev->vdev.cops = &virtio_mmio_config_ops;
 	vm_dev->name = "virtio_mmio";
 
-	if (vm_dev->base == NULL) {
+	vm_dev->base = pf_dev_ioremap(pfdev);
+	if (unlikely(PTRISERR(vm_dev->base))) {
 		rc = -EFAULT;
 		goto free_vmdev;
 	}
 
-#ifdef CONFIG_PAGING
-	rc = virtio_mmio_map_device(vm_dev);
-	if (unlikely(rc))
-		return rc;
-#endif /* CONFIG_PAGING */
+	rc = pf_dev_request_irq(pfdev, &vm_dev->irq);
+	if (unlikely(rc < 0)) {
+		rc = -EFAULT;
+		goto free_vmdev;
+	}
+	pfdev->irq = vm_dev->irq;
 
 	magic = virtio_mem_cread32(vm_dev->base, VIRTIO_MMIO_MAGIC_VALUE);
 	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
