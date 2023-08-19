@@ -157,7 +157,20 @@ exit_ack:
 #ifdef CONFIG_UKPLAT_ISR_ECTX_ASSERTIONS
 	ukarch_ectx_assert_equal(ectx);
 #endif
+
+#if CONFIG_ARCH_X86_64
+	/* FIXME
+	 * On arm64 IRQ acknowledgement happens when taking the IRQ,
+	 * so this will cause duplicate acknowledgement before clearing
+	 * the IRQ.
+	 *
+	 * As the moment of acknlowedging IRQs is architecture-specific,
+	 * this must be moved to the architectural part of the intctrl API.
+	 */
 	intctrl_ack_irq(irq);
+#else /* !CONFIG_ARCH_X86_64 */
+	return;
+#endif /* !CONFIG_ARCH_X86_64 */
 }
 
 int ukplat_irq_init(struct uk_alloc *a __unused)
