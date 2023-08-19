@@ -79,3 +79,8 @@ void intctrl_send_ipi(uint8_t sgintid, uint32_t cpuid)
 {
 	gic->ops.gic_sgi_gen(sgintid, cpuid);
 }
+
+void intctrl_set_type(unsigned int irq, uint32_t trigger)
+{
+	gic->ops.set_irq_type(irq, trigger);
+}
