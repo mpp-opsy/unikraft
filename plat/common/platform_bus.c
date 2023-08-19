@@ -43,6 +43,12 @@
 #include <ofw/fdt.h>
 #endif
 #include <uk/plat/common/bootinfo.h>
+#include <kvm/intctrl.h>
+
+#if CONFIG_PAGING
+#include <uk/errptr.h>
+#include <uk/plat/paging.h>
+#endif /* CONFIG_PAGING */
 
 static void *dtb;
 
@@ -226,6 +232,56 @@ static int pf_init(struct uk_alloc *a)
 	}
 	return 0;
 }
+
+int pf_dev_request_irq(struct pf_device *pfdev, unsigned long *irq)
+{
+	int rc = 0;
+
+	*irq = gic_irq_translate(pfdev->irq_type, pfdev->irq);
+
+	intctrl_set_type(*irq, pfdev->irq_trigger);
+
+	return rc;
+}
+
+#ifdef CONFIG_PAGING
+void *pf_dev_ioremap(struct pf_device *pfdev)
+{
+	int rc;
+	struct uk_pagetable *pt;
+	__vaddr_t vaddr;
+	unsigned long attr;
+	unsigned long pages;
+
+	attr = PAGE_ATTR_PROT_RW;
+#ifdef CONFIG_ARCH_ARM_64
+	attr |= PAGE_ATTR_TYPE_DEVICE_nGnRnE;
+#endif /* CONFIG_ARCH_ARM_64 */
+
+	pages = pfdev->size >> PAGE_SHIFT;
+
+	pt = ukplat_pt_get_active();
+
+	/* FIXME Until we port ukvmem to arm64 we map devices 1:1 */
+	vaddr = pfdev->base;
+	rc = ukplat_page_map(pt, vaddr, pfdev->base, pages, attr, 0);
+	if (!rc)
+		goto out;
+
+	if (rc == -EEXIST)
+		rc = ukplat_page_set_attr(pt, vaddr, pages, attr, 0);
+
+	if (unlikely(rc))
+		return ERR2PTR(rc);
+out:
+	return (void *)vaddr;
+}
+#else
+void *pf_dev_ioremap(struct pf_device *pfdev)
+{
+	return pfdev->base;
+}
+#endif /* CONFIG_PAGING */
 
 void _pf_register_driver(struct pf_driver *drv)
 {

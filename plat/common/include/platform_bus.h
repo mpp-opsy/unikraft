@@ -50,7 +50,7 @@
 #define UK_MAX_VIRTIO_MMIO_DEVICE (0x2)
 
 struct pf_device_id {
-	uint16_t device_id;
+	__u16 device_id;
 };
 
 struct device_match_table {
@@ -87,11 +87,13 @@ struct pf_device {
 	enum pf_device_state state;
 
 	int fdt_offset;	/* The start offset of fdt node for device */
-	uint64_t base;
-	unsigned long irq;
+	__paddr_t base;
+	__sz size;
+	unsigned int irq;
+	unsigned int irq_type;
+	unsigned int irq_trigger;
 };
 UK_TAILQ_HEAD(pf_device_list, struct pf_device);
-
 
 #define PF_REGISTER_DRIVER(b)                  \
 	_PF_REGISTER_DRIVER(__LIBNAME__, b)
@@ -111,5 +113,22 @@ UK_TAILQ_HEAD(pf_device_list, struct pf_device);
 
 /* Do not use this function directly: */
 void _pf_register_driver(struct pf_driver *drv);
+
+/* (re)map a platform device's MMIO region
+ *
+ * This function tries to map the provided region using
+ * architecture-appropriate attributes. If the region is
+ * already mapped, the attributes of the existing mapping
+ * are updated.
+ *
+ * @param  pfdev Device to (re)map
+ * @return virtual address or error pointer
+ */
+void *pf_dev_ioremap(struct pf_device *pfdev);
+
+/* TODO
+ *
+ */
+int pf_dev_request_irq(struct pf_device *pfdev, unsigned long *irq);
 
 #endif /* __UKPLAT_COMMON_PF_BUS_H__ */
