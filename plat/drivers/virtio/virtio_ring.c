@@ -106,9 +106,12 @@ void virtqueue_intr_disable(struct virtqueue *vq)
 	if (vq->uses_event_idx) {
 		vring_used_event(&vrq->vring) =
 			vrq->last_used_desc_idx - vrq->vring.num - 1;
-		return;
+	} else {
+		vrq->vring.avail->flags |= (VRING_AVAIL_F_NO_INTERRUPT);
 	}
-	vrq->vring.avail->flags |= (VRING_AVAIL_F_NO_INTERRUPT);
+
+	mb();
+	return;
 }
 
 int virtqueue_intr_enable(struct virtqueue *vq)
