@@ -1,11 +1,12 @@
 config HAVE_MMIO
 	bool
 
-config LIBVIRTIO_MMIO
+menuconfig LIBVIRTIO_MMIO
 	bool "Virtio MMIO transport"
 	depends on HAVE_MMIO
 	depends on VIRTIO_DEVICE
 	select LIBUKBUS_PLATFORM
+	select LIBNOLIBC if (!HAVE_LIBC && LIBUKPARAM)
 	help
 		Virtio MMIO transport.
 
@@ -14,5 +15,19 @@ if LIBVIRTIO_MMIO
 config LIBVIRTIO_MMIO_FDT
 	bool
 	default y if (LIBFDT && LIBUKOFW)
+
+config VIRTIO_MMIO_LINUX_COMPAT_CMDLINE
+	bool "Linux compatible command line"
+	select LIBUKPARAM
+	help
+		Accept MMIO devices using the linux command line parameter
+		format, ie:
+
+		virtio_mmio.device = <size>@<base>:<irq>[:<id>]
+
+		If this option is not enabled, use the defult libukparam
+		format for this library, ie:
+
+		libvirtio_mmio.device = <size>@<base>:<irq>[:<id>]
 
 endif
