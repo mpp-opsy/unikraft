@@ -10,4 +10,12 @@ config LIBUKINTCTLR_APIC
 	bool "Intel APIC"
 	depends on HAVE_APIC
 	select LIBUKINTCTLR_PIC
+	imply LIBUKINTCTLR_APIC_FULL_IDT
 	depends on ARCH_X86_64
+
+if LIBUKINTCTLR_XPIC_APIC
+
+config LIBUKINTCTLR_APIC_FULL_IDT
+	bool "Allocate the full IDT"
+
+endif
