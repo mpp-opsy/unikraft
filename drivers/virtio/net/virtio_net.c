@@ -158,6 +158,8 @@ struct virtio_net_device {
 	__u8 state;
 	/* RX promiscuous mode. */
 	__u8 promisc : 1;
+	/* VirtIO modern network standard. */
+	__u8 modern;
 };
 
 /**
@@ -205,10 +207,10 @@ static int virtio_netdev_txq_info_get(struct uk_netdev *dev, __u16 queue_id,
 static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 				     struct uk_netbuf **netbuf);
 static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
-				     struct uk_netbuf *netbuf);
+				     struct uk_netbuf *netbuf, __u8 is_modern);
 static int virtio_netdev_recv_done(struct virtqueue *vq, void *priv);
 static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
-				   __u16 num, int notify);
+				   __u16 num, int notify, __u8 is_modern);
 
 /**
  * Static global constants
@@ -263,8 +265,7 @@ static void virtio_netdev_xmit_free(struct uk_netdev_tx_queue *txq)
 #define RX_FILLUP_BATCHLEN 64
 
 static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
-				   __u16 nb_desc,
-				   int notify)
+				   __u16 nb_desc, int notify, __u8 is_modern)
 {
 	struct uk_netbuf *netbuf[RX_FILLUP_BATCHLEN];
 	int rc = 0;
@@ -289,7 +290,7 @@ static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
 		for (i = 0; i < cnt; i++) {
 			uk_pr_debug("Enqueue netbuf %"PRIu16"/%"PRIu16" (%p) to virtqueue %p...\n",
 				    i + 1, cnt, netbuf[i], rxq);
-			rc = virtio_netdev_rxq_enqueue(rxq, netbuf[i]);
+			rc = virtio_netdev_rxq_enqueue(rxq, netbuf[i], is_modern);
 			if (unlikely(rc < 0)) {
 				uk_pr_err("Failed to add a buffer to receive virtqueue %p: %d\n",
 					  rxq, rc);
@@ -331,10 +332,10 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 			      struct uk_netdev_tx_queue *queue,
 			      struct uk_netbuf *pkt)
 {
-	struct virtio_net_device *vndev __unused;
+	struct virtio_net_device *vndev;
 	struct virtio_net_hdr *vhdr;
 	struct virtio_net_hdr_padded *padded_hdr;
-	int16_t header_sz = sizeof(*padded_hdr);
+	int16_t header_sz;
 	int rc = 0;
 	int status = 0x0;
 	size_t total_len = 0;
@@ -345,6 +346,9 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	UK_ASSERT(pkt && queue);
 
 	vndev = to_virtionetdev(dev);
+
+	header_sz = vndev->modern ? VIRTIO_HDR_LEN : sizeof(*vhdr);
+
 	/**
 	 * We are reclaiming the free descriptors from buffers. The function is
 	 * not protected by means of locks. We need to be careful if there are
@@ -357,7 +361,8 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	/**
 	 * Use the preallocated header space for the virtio header.
 	 */
-	rc = uk_netbuf_header(pkt, header_sz);
+	rc = uk_netbuf_header(pkt, vndev->modern ?
+			      VIRTIO_HDR_LEN : sizeof(*padded_hdr));
 	if (unlikely(rc != 1)) {
 		uk_pr_err("Failed to prepend virtio header\n");
 		rc = -ENOSPC;
@@ -378,11 +383,13 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	 *       to `uk_sglist_append_netbuf()`. However, a netbuf
 	 *       chain can only once have set the PARTIAL_CSUM flag.
 	 */
-	memset(vhdr, 0, sizeof(*vhdr));
+	memset(vhdr, 0, header_sz);
 	if (pkt->flags & UK_NETBUF_F_PARTIAL_CSUM) {
 		vhdr->flags       |= VIRTIO_NET_HDR_F_NEEDS_CSUM;
 		/* `csum_start` is without header size */
-		vhdr->csum_start   = pkt->csum_start - header_sz;
+		vhdr->csum_start   = pkt->csum_start -
+				     (vndev->modern ? VIRTIO_HDR_LEN :
+				      sizeof(*padded_hdr));
 		vhdr->csum_offset  = pkt->csum_offset;
 	}
 	vhdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
@@ -400,7 +407,8 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	 * 1 for the virtio header and the other for the actual network packet.
 	 */
 	/* Appending the data to the list. */
-	rc = uk_sglist_append(&queue->sg, vhdr, sizeof(*vhdr));
+	rc = uk_sglist_append(&queue->sg, vhdr, vndev->modern ?
+			      VIRTIO_HDR_LEN : sizeof(struct virtio_net_hdr));
 	if (unlikely(rc != 0)) {
 		uk_pr_err("Failed to append to the sg list\n");
 		goto err_remove_vhdr;
@@ -463,11 +471,10 @@ err_exit:
 }
 
 static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
-				     struct uk_netbuf *netbuf)
+				     struct uk_netbuf *netbuf, __u8 is_modern)
 {
 	int rc = 0;
 	struct virtio_net_hdr_padded *rxhdr;
-	int16_t header_sz = sizeof(*rxhdr);
 	__u8 *buf_start;
 	size_t buf_len = 0;
 	struct uk_sglist *sg;
@@ -486,7 +493,7 @@ static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	/**
 	 * Retrieve the buffer header length.
 	 */
-	rc = uk_netbuf_header(netbuf, header_sz);
+	rc = uk_netbuf_header(netbuf, sizeof(*rxhdr));
 	if (unlikely(rc != 1)) {
 		uk_pr_err("Failed to allocate space to prepend virtio header\n");
 		return -EINVAL;
@@ -497,7 +504,8 @@ static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	uk_sglist_reset(sg);
 
 	/* Appending the header buffer to the sglist */
-	uk_sglist_append(sg, rxhdr, sizeof(struct virtio_net_hdr));
+	uk_sglist_append(sg, rxhdr, is_modern ? VIRTIO_HDR_LEN :
+			 sizeof(struct virtio_net_hdr));
 
 	/* Appending the data buffer to the sglist */
 	uk_sglist_append(sg, buf_start, buf_len);
@@ -553,17 +561,18 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	 */
 	buf->len = len + VTNET_RX_HEADER_PAD;
 	rc = uk_netbuf_header(buf,
-			      -((int16_t)sizeof(struct virtio_net_hdr_padded)));
+			      -((uint16_t)sizeof(struct virtio_net_hdr_padded)));
 	UK_ASSERT(rc == 1);
 	*netbuf = buf;
 
 	return ret;
 }
 
-static int virtio_netdev_recv(struct uk_netdev *dev __unused,
+static int virtio_netdev_recv(struct uk_netdev *dev,
 			      struct uk_netdev_rx_queue *queue,
 			      struct uk_netbuf **pkt)
 {
+	struct virtio_net_device *vndev;
 	int status = 0x0;
 	int rc = 0;
 
@@ -573,13 +582,15 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 	/* Queue interrupts have to be off when calling receive */
 	UK_ASSERT(!(queue->intr_enabled & VTNET_INTR_EN));
 
+	vndev = to_virtionetdev(dev);
 	rc = virtio_netdev_rxq_dequeue(queue, pkt);
 	if (unlikely(rc < 0)) {
 		uk_pr_err("Failed to dequeue the packet: %d\n", rc);
 		goto err_exit;
 	}
 	status |= (*pkt) ? UK_NETDEV_STATUS_SUCCESS : 0x0;
-	status |= virtio_netdev_rx_fillup(queue, (queue->nb_desc - rc), 1);
+	status |= virtio_netdev_rx_fillup(queue, (queue->nb_desc - rc), 1,
+					  vndev->modern);
 
 	/* Enable interrupt only when user had previously enabled it */
 	if (queue->intr_enabled & VTNET_INTR_USR_EN_MASK) {
@@ -604,7 +615,7 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 			 */
 			status |= virtio_netdev_rx_fillup(queue,
 							  (queue->nb_desc - rc),
-							  1);
+							  1, vndev->modern);
 
 			/* Need to enable the interrupt on the last packet */
 			rc = virtqueue_intr_enable(queue->vq);
@@ -660,7 +671,7 @@ static struct uk_netdev_rx_queue *virtio_netdev_rx_queue_setup(
 	rxq->alloc_rxpkts_argp = conf->alloc_rxpkts_argp;
 
 	/* Allocate receive buffers for this queue */
-	virtio_netdev_rx_fillup(rxq, rxq->nb_desc, 0);
+	virtio_netdev_rx_fillup(rxq, rxq->nb_desc, 0, vndev->modern);
 
 exit:
 	return rxq;
@@ -903,6 +914,10 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	else
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_MTU);
 
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_STATUS)) {
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_STATUS);
+	}
+
 	/**
 	 * Gratuitous ARP
 	 * NOTE: We tell that we will do gratuitous ARPs ourselves.
@@ -920,6 +935,12 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	} else {
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_CSUM);
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_GUEST_CSUM);
+	}
+
+	/* VirtIO modern */
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_F_VERSION_1)) {
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_F_VERSION_1);
+		vndev->modern = 1;
 	}
 
 	/**
@@ -955,6 +976,11 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 		 */
 		vndev->max_mtu = vndev->mtu = UK_ETH_PAYLOAD_MAXLEN;
 	}
+
+	virtio_dev_status_update(vndev->vdev,
+				 (VIRTIO_CONFIG_STATUS_ACK |
+				  VIRTIO_CONFIG_STATUS_DRIVER |
+				  VIRTIO_CONFIG_STATUS_FEATURES_OK));
 
 	return 0;
 
@@ -1201,6 +1227,7 @@ static int virtio_net_add_dev(struct virtio_dev *vdev)
 	vndev->uid = rc;
 	rc = 0;
 	vndev->promisc = 0;
+	vndev->modern = 0;
 
 	/**
 	 * TODO:
