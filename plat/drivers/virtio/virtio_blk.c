@@ -333,7 +333,7 @@ out:
 	return rc;
 }
 
-static int virtio_blkdev_submit_request(struct uk_blkdev *dev,
+static int virtio_blkdev_submit_request(struct uk_blkdev *dev __unused,
 		struct uk_blkdev_queue *queue,
 		struct uk_blkreq *req)
 {
@@ -342,7 +342,6 @@ static int virtio_blkdev_submit_request(struct uk_blkdev *dev,
 
 	UK_ASSERT(req);
 	UK_ASSERT(queue);
-	UK_ASSERT(dev);
 
 	rc = virtio_blkdev_queue_enqueue(queue, req);
 	if (likely(rc >= 0)) {
@@ -404,13 +403,11 @@ out:
 	return ret;
 }
 
-static int virtio_blkdev_complete_reqs(struct uk_blkdev *dev,
+static int virtio_blkdev_complete_reqs(struct uk_blkdev *dev __unused,
 		struct uk_blkdev_queue *queue)
 {
 	struct uk_blkreq *req;
 	int rc = 0;
-
-	UK_ASSERT(dev);
 
 	/* Queue interrupts have to be off when calling receive */
 	UK_ASSERT(!(queue->intr_enabled & VTBLK_INTR_EN));
@@ -461,12 +458,10 @@ static int virtio_blkdev_recv_done(struct virtqueue *vq, void *priv)
 	return 1;
 }
 
-static int virtio_blkdev_queue_intr_enable(struct uk_blkdev *dev,
+static int virtio_blkdev_queue_intr_enable(struct uk_blkdev *dev __unused,
 		struct uk_blkdev_queue *queue)
 {
 	int rc = 0;
-
-	UK_ASSERT(dev);
 
 	/* If the interrupt is enabled */
 	if (queue->intr_enabled & VTBLK_INTR_EN)
@@ -485,10 +480,9 @@ static int virtio_blkdev_queue_intr_enable(struct uk_blkdev *dev,
 	return rc;
 }
 
-static int virtio_blkdev_queue_intr_disable(struct uk_blkdev *dev,
+static int virtio_blkdev_queue_intr_disable(struct uk_blkdev *dev __unused,
 		struct uk_blkdev_queue *queue)
 {
-	UK_ASSERT(dev);
 	UK_ASSERT(queue);
 
 	virtqueue_intr_disable(queue->vq);
