@@ -61,6 +61,7 @@
 		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_MQ);		\
 		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_SIZE_MAX);	\
 		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_FLUSH);	\
+		VIRTIO_FEATURE_SET(features, VIRTIO_F_VERSION_1);	\
 	} while (0)
 
 static struct uk_alloc *a;
@@ -869,6 +870,10 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	 */
 	vbdev->vdev->features &= host_features;
 	virtio_feature_set(vbdev->vdev, vbdev->vdev->features);
+
+	virtio_dev_status_update(vbdev->vdev, (VIRTIO_CONFIG_STATUS_ACK |
+					       VIRTIO_CONFIG_STATUS_DRIVER |
+					       VIRTIO_CONFIG_STATUS_FEATURES_OK));
 
 exit:
 	return rc;
