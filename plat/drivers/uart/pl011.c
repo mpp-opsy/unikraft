@@ -116,6 +116,8 @@ static int init_pl011(uint64_t base, size_t len)
 	/* Just enable UART and data transmit/receive */
 	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
 
+	pl011_uart_initialized = 1;
+
 	return 0;
 }
 
