@@ -33,6 +33,11 @@
 #include <uk/assert.h>
 #include <arm/cpu.h>
 
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
+
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
 #define NS16550_IER_OFFSET	0x01U
@@ -115,8 +120,13 @@ static void ns16550_reg_write(uint32_t reg, uint32_t value)
 
 static void init_ns16550(uint64_t base)
 {
+#if CONFIG_PAGING
+	ns16550_uart_base = uk_bus_pf_devmap(base, size);
+	if (unlikely(PTRISERR(ns16550_uart_base)))
+		return PTR2ERR(ns16550_uart_base);
+#else /* !CONFIG_PAGING */
 	ns16550_uart_base = base;
-	ns16550_uart_initialized = 1;
+#endif /* !CONFIG_PAGING */
 
 	/* Disable all interrupts */
 	ns16550_reg_write(NS16550_IER_OFFSET,
@@ -125,6 +135,8 @@ static void init_ns16550(uint64_t base)
 	/* Disable FIFOs */
 	ns16550_reg_write(NS16550_FCR_OFFSET,
 		ns16550_reg_read(NS16550_FCR_OFFSET) & ~(NS16550_FCR_FIFO_EN));
+
+	ns16550_uart_initialized = 1;
 }
 
 void ns16550_console_init(const void *dtb)
