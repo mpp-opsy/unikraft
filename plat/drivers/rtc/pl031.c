@@ -41,6 +41,11 @@
 #include <rtc/rtc.h>
 #include <rtc/pl031.h>
 
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
+
 static __u64 pl031_base_addr;
 static int pl031_irq;
 
@@ -176,6 +181,12 @@ int pl031_init_rtc(void *dtb)
 		return -EINVAL;
 	}
 	uk_pr_info("Found RTC at: 0x%lx\n", pl031_base_addr);
+
+#if CONFIG_PAGING
+	pl031_base_addr = uk_bus_pf_devmap(pl031_base_addr, size);
+	if (unlikely(PTRISERR(pl031_base_addr)))
+		return PTR2ERR(pl031_base_addr);
+#endif /* CONFIG_PAGING */
 
 	rc = uk_intctlr_irq_fdt_xlat(dtb, offs, 0, &irq);
 	if (unlikely(rc))
