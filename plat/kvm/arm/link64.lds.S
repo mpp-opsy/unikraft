@@ -31,8 +31,7 @@
  */
 #include <uk/arch/limits.h>
 #include <uk/plat/common/common.lds.h>
-
-#include <kvm-arm64/image.h>
+#include <uk/platform.h>
 
 OUTPUT_FORMAT("elf64-littleaarch64")
 OUTPUT_ARCH(aarch64)
@@ -55,12 +54,12 @@ PHDRS
  * address.
  */
 SECTIONS {
-	. = RAM_BASE_ADDR;
+	. = UKPLAT_KVM_IMAGE_BASE;
 
 	/* Place DTB binary at the beginning of the RAM */
 	_dtb = .;
 	_start_ram_addr = .;
-	. = . + DTB_RESERVED_SIZE;
+	. = . + UKPLAT_KVM_DTB_SIZE;
 
 	_base_addr = .;		/* Symbol to represent the load base address */
 
