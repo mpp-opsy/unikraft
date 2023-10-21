@@ -23,6 +23,11 @@
 #include <uk/assert.h>
 #include <arm/cpu.h>
 
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
+
 /* PL011 UART registers and masks*/
 /* Data register */
 #define REG_UARTDR_OFFSET	0x00
@@ -65,27 +70,34 @@
 /*
  * PL011 UART base address
  * As we are using the PA = VA mapping, some SoC would set PA 0
- * as a valid address, so we can't use pl011_uart_bas == 0 to
+ * as a valid address, so we can't use pl011_uart_base == 0 to
  * indicate PL011 hasn't been initialized. In this case, we
  * use pl011_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
 #if defined(CONFIG_EARLY_PRINT_PL011_UART_ADDR)
 static uint8_t pl011_uart_initialized = 1;
-static uint64_t pl011_uart_bas = CONFIG_EARLY_PRINT_PL011_UART_ADDR;
+static uint64_t pl011_uart_base = CONFIG_EARLY_PRINT_PL011_UART_ADDR;
 #else
 static uint8_t pl011_uart_initialized;
-static uint64_t pl011_uart_bas;
+static uint64_t pl011_uart_base;
 #endif
 
 /* Macros to access PL011 Registers with base address */
-#define PL011_REG(r)		((uint16_t *)(pl011_uart_bas + (r)))
+#define PL011_REG(r)		((uint16_t *)(pl011_uart_base + (r)))
 #define PL011_REG_READ(r)	ioreg_read16(PL011_REG(r))
 #define PL011_REG_WRITE(r, v)	ioreg_write16(PL011_REG(r), v)
 
-static void init_pl011(uint64_t bas)
+static int init_pl011(uint64_t base, size_t len)
 {
-	pl011_uart_bas = bas;
+#if CONFIG_PAGING
+	/* Map device region */
+	pl011_uart_base = uk_bus_pf_devmap(base, len);
+	if (unlikely(PTRISERR(pl011_uart_base)))
+		return PTR2ERR(pl011_uart_base);
+#else /* !CONFIG_PAGING */
+	pl011_uart_base = base;
+#endif /* !CONFIG_PAGING */
 
 	/* Mask all interrupts */
 	PL011_REG_WRITE(REG_UARTIMSC_OFFSET,
@@ -103,13 +115,15 @@ static void init_pl011(uint64_t bas)
 
 	/* Just enable UART and data transmit/receive */
 	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
+
+	return 0;
 }
 
-void pl011_console_init(const void *dtb)
+int pl011_console_init(const void *dtb)
 {
 	int offset, len, naddr, nsize;
 	const uint64_t *regs;
-	uint64_t reg_uart_bas;
+	uint64_t reg_uart_base;
 
 	uk_pr_info("Serial initializing\n");
 
@@ -129,11 +143,10 @@ void pl011_console_init(const void *dtb)
 	if (regs == NULL || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
 
-	reg_uart_bas = fdt64_to_cpu(regs[0]);
-	uk_pr_info("Found PL011 UART on: 0x%lx\n", reg_uart_bas);
+	reg_uart_base = fdt64_to_cpu(regs[0]);
+	uk_pr_info("Found PL011 UART at: 0x%lx\n", reg_uart_base);
 
-	init_pl011(reg_uart_bas);
-	uk_pr_info("PL011 UART initialized\n");
+	return init_pl011(reg_uart_base, len);
 }
 
 int ukplat_coutd(const char *str, uint32_t len)
