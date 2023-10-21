@@ -163,8 +163,6 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 
 	fdt = (void *)bi->dtb;
 
-	kvm_console_init(fdt);
-
 	rc = cmdline_init(bi);
 	if (unlikely(rc < 0))
 		UK_CRASH("Failed to initialize command-line\n");
@@ -178,11 +176,13 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 		UK_CRASH("Boot stack alloc failed\n");
 	bstack = (void *)((__uptr)bstack + __STACK_SIZE);
 
-
 	/* Initialize paging */
 	rc = ukplat_mem_init();
 	if (unlikely(rc))
 		UK_CRASH("Could not initialize paging (%d)\n", rc);
+
+	/* Initialize the console */
+	kvm_console_init(fdt);
 
 #if defined(CONFIG_ENFORCE_W_XOR_X) && defined(CONFIG_PAGING)
 	enforce_w_xor_x();
@@ -199,7 +199,6 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 	if (unlikely(rc))
 		UK_CRASH("Could not initialize MTE (%d)\n", rc);
 #endif /* CONFIG_HAVE_MEMTAG */
-
 
 #if defined(CONFIG_UKPLAT_ACPI)
 	rc = acpi_init();
