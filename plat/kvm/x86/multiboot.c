@@ -75,7 +75,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 			mrd.vbase = mi->cmdline; /* 1:1 mapping */
 			mrd.len   = cmdline_len;
 			mrd.type  = UKPLAT_MEMRT_CMDLINE;
-			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+			mrd.flags = UKPLAT_MEMRF_READ;
 
 			mrd_insert(bi, &mrd);
 
@@ -103,7 +103,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 			mrd.vbase = mods[i].mod_start; /* 1:1 mapping */
 			mrd.len   = mods[i].mod_end - mods[i].mod_start;
 			mrd.type  = UKPLAT_MEMRT_INITRD;
-			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+			mrd.flags = UKPLAT_MEMRF_READ;
 
 #ifdef CONFIG_UKPLAT_MEMRNAME
 			strncpy(mrd.name, (char *)(__uptr)mods[i].cmdline,
@@ -144,8 +144,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 					    UKPLAT_MEMRF_WRITE;
 			} else {
 				mrd.type  = UKPLAT_MEMRT_RESERVED;
-				mrd.flags = UKPLAT_MEMRF_READ |
-					    UKPLAT_MEMRF_MAP;
+				mrd.flags = UKPLAT_MEMRF_READ;
 
 				/* We assume that reserved regions cannot
 				 * overlap with loaded modules.
