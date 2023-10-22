@@ -1436,8 +1436,7 @@ static inline unsigned long bootinfo_to_page_attr(__u16 flags)
 	return prot;
 }
 
-extern struct ukplat_memregion_desc bpt_unmap_mrd;
-
+#include <uk/platform.h>
 int ukplat_paging_init(void)
 {
 	struct ukplat_memregion_desc *mrd;
@@ -1457,10 +1456,6 @@ int ukplat_paging_init(void)
 		UK_ASSERT(!(mrd->pbase & ~PAGE_MASK));
 		UK_ASSERT(mrd->len);
 		UK_ASSERT(!(mrd->len & ~PAGE_MASK));
-
-		/* Not mapped */
-		mrd->vbase = __U64_MAX;
-		mrd->flags &= ~UKPLAT_MEMRF_PERMS;
 
 		if (!kernel_pt.fa) {
 			rc = ukplat_pt_init(&kernel_pt, mrd->pbase, mrd->len);
@@ -1488,41 +1483,67 @@ int ukplat_paging_init(void)
 	if (unlikely(!kernel_pt.fa))
 		return rc;
 
-	/* Perform unmappings */
-	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_UNMAP,
-				 UKPLAT_MEMRF_UNMAP) {
-		UK_ASSERT(mrd->vbase != __U64_MAX);
+	/* Now map / unmap any regions requried by the mrd list */
 
-		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
-		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
+	__vaddr_t next_region_base, next_region_end;
+	__vaddr_t last_region_end;
 
-		rc = ukplat_page_unmap(&kernel_pt, vaddr,
-				       len >> PAGE_SHIFT,
-				       PAGE_FLAG_KEEP_FRAMES);
-		if (unlikely(rc))
-			return rc;
-	}
+	last_region_end  = UKPLAT_RAM_BASE;
 
-	/* Perform mappings */
-	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_MAP,
-				 UKPLAT_MEMRF_MAP) {
-		UK_ASSERT(mrd->vbase != __U64_MAX);
+	ukplat_memregion_foreach(&mrd, 0, 0, 0) {
+		/* TBD sergiu */
+		#if 0
+		//UK_ASSERT(IS_ALIGNED(mrd->vbase, __PAGE_SIZE));
+		//UK_ASSERT(IS_ALIGNED(mrd->pbase, __PAGE_SIZE));
+		//UK_ASSERT(IS_ALIGNED(mrd->len, __PAGE_SIZE));
+		#endif
 
 		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
 		paddr = PAGE_ALIGN_DOWN(mrd->pbase);
 		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
 
-#if defined(CONFIG_ARCH_ARM_64)
-		if (!RANGE_CONTAIN(bpt_unmap_mrd.pbase, bpt_unmap_mrd.len,
-				   paddr, len))
-			continue;
-#endif
+		/* FIXME ALIGN_UP TBD sergiu */
+		next_region_base = mrd->vbase;
+		next_region_end = ALIGN_UP(mrd->vbase + mrd->len, PAGE_SIZE);
 
-		prot  = bootinfo_to_page_attr(mrd->flags);
+		/* If next_region_base > last_region_end, then there is
+		 * a hole between the two mrds. Unmap that region.
+		 */
+		if (next_region_base > last_region_end) {
+			len = next_region_base - last_region_end;
+			rc = ukplat_page_unmap(&kernel_pt, last_region_end,
+					       len >> PAGE_SHIFT, 0);
+			if (unlikely(rc < 0))
+				return rc;
+		}
+		last_region_end  = next_region_end;
 
-		rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
-				     len >> PAGE_SHIFT, prot, 0);
-		if (unlikely(rc))
+		if (mrd->flags & UKPLAT_MEMRF_MAP) {
+			prot = bootinfo_to_page_attr(mrd->flags);
+
+			rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
+					     len >> PAGE_SHIFT, prot, 0);
+			if (unlikely(rc))
+				return rc;
+		}
+
+		/* All free memory has already been assigned to the
+		 * frame allocator. Mark as invalid just in case.
+		 */
+		if (mrd->type == UKPLAT_MEMRT_FREE) {
+			mrd->vbase = __U64_MAX;
+			mrd->flags &= ~UKPLAT_MEMRF_PERMS;
+		}
+	}
+
+	/* Treat any memory past the last memreg as a hole */
+	if (last_region_end < UKPLAT_RAM_END) {
+		vaddr = last_region_end;
+		len   = UKPLAT_RAM_END - last_region_end;
+
+		rc = ukplat_page_unmap(&kernel_pt, vaddr,
+				       len >> PAGE_SHIFT, 0);
+		if (unlikely(rc < 0))
 			return rc;
 	}
 

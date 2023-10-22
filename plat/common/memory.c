@@ -35,10 +35,13 @@
 #include <stddef.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
+#include <uk/platform.h>
 #include <uk/asm/limits.h>
 #include <uk/alloc.h>
 
-extern struct ukplat_memregion_desc bpt_unmap_mrd;
+#if CONFIG_PAGING
+#include <uk/plat/paging.h>
+#endif /* CONFIG_PAGING */
 
 static struct uk_alloc *plat_allocator;
 
@@ -64,16 +67,16 @@ struct uk_alloc *ukplat_memallocator_get(void)
 void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 {
 	struct ukplat_memregion_desc *mrd, alloc_mrd = {0};
-	__vaddr_t unmap_start, unmap_end;
-	__sz unmap_len, desired_sz;
+	__sz desired_sz;
 	struct ukplat_bootinfo *bi;
 	__paddr_t pstart, pend;
 	__paddr_t ostart, olen;
 	int rc;
 
-	unmap_start = ALIGN_DOWN(bpt_unmap_mrd.vbase, __PAGE_SIZE);
-	unmap_end = unmap_start + ALIGN_DOWN(bpt_unmap_mrd.len, __PAGE_SIZE);
-	unmap_len = unmap_end - unmap_start;
+	/* Allocated regions are carved off free memory
+	 * which should be already mapped.
+	 */
+	UK_ASSERT(!(flags & UKPLAT_MEMRF_MAP));
 
 	/* Preserve desired size */
 	desired_sz = size;
@@ -83,24 +86,12 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		pstart = ALIGN_UP(mrd->pbase, __PAGE_SIZE);
 		pend   = pstart + size;
 
-		if (unmap_len &&
-		    (!RANGE_CONTAIN(unmap_start, unmap_len, pstart, size) ||
-		    pend > mrd->pbase + mrd->len))
-			continue;
-
 		if ((mrd->flags & UKPLAT_MEMRF_PERMS) !=
 			    (UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE))
 			return NULL;
 
 		ostart = mrd->pbase;
 		olen   = mrd->len;
-
-		/* Check whether we are allocating from an in-image memory hole
-		 * or not. If no, then it is not already mapped.
-		 */
-		if (!RANGE_CONTAIN(__BASE_ADDR, __END - __BASE_ADDR,
-				   pstart, size))
-			flags |= UKPLAT_MEMRF_MAP;
 
 		/* If fragmenting this memory region leaves it with length 0,
 		 * then simply overwrite and return it instead.
@@ -126,7 +117,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		alloc_mrd.pbase = pstart;
 		alloc_mrd.len   = desired_sz;
 		alloc_mrd.type  = type;
-		alloc_mrd.flags = flags | UKPLAT_MEMRF_MAP;
+		alloc_mrd.flags = flags;
 
 		bi = ukplat_bootinfo_get();
 		if (unlikely(!bi))
@@ -501,85 +492,30 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc **mrd)
 	return 0;
 }
 
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-
-static int ukplat_memregion_list_insert_unmaps(struct ukplat_bootinfo *bi)
-{
-	__vaddr_t unmap_start, unmap_end;
-	int rc;
-
-	if (!bpt_unmap_mrd.len)
-		return 0;
-
-	/* Be PIE aware: split the unmap memory region so that we do no unmap
-	 * the Kernel image.
-	 */
-	unmap_start = ALIGN_DOWN(bpt_unmap_mrd.vbase, __PAGE_SIZE);
-	unmap_end = unmap_start + ALIGN_DOWN(bpt_unmap_mrd.len, __PAGE_SIZE);
-
-	/* After Kernel image */
-	rc = ukplat_memregion_list_insert(&bi->mrds,
-			&(struct ukplat_memregion_desc){
-				.vbase = ALIGN_UP(__END, __PAGE_SIZE),
-				.pbase = 0,
-				.len   = unmap_end -
-					 ALIGN_UP(__END, __PAGE_SIZE),
-				.type  = 0,
-				.flags = UKPLAT_MEMRF_UNMAP,
-			});
-	if (unlikely(rc < 0))
-		return rc;
-
-	/* Before Kernel image */
-	return ukplat_memregion_list_insert(&bi->mrds,
-			&(struct ukplat_memregion_desc){
-				.vbase = unmap_start,
-				.pbase = 0,
-				.len   = ALIGN_DOWN(__BASE_ADDR, __PAGE_SIZE) -
-					 unmap_start,
-				.type  = 0,
-				.flags = UKPLAT_MEMRF_UNMAP,
-			});
-}
-
+#ifdef CONFIG_PAGING
 int ukplat_mem_init(void)
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
 	int rc;
 
 	UK_ASSERT(bi);
-
-	rc = ukplat_memregion_list_insert_unmaps(bi);
-	if (unlikely(rc < 0))
-		return rc;
 
 	rc = ukplat_paging_init();
 	if (unlikely(rc < 0))
 		return rc;
 
-	/* Remove the two memory regions inserted by
-	 * ukplat_memregion_list_insert_unmaps(). Due to their `pbase` nature
-	 * and us never adding regions starting from zero-page, they are
-	 * guaranteed to be the first in the list
-	 */
-	ukplat_memregion_list_delete(&bi->mrds, 0);
-	ukplat_memregion_list_delete(&bi->mrds, 0);
-
 	return 0;
 }
-#else /* CONFIG_HAVE_PAGING */
+#else /* !CONFIG_PAGING */
 int ukplat_mem_init(void)
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
 	struct ukplat_memregion_desc *mrdp;
-	__vaddr_t unmap_end;
+	__vaddr_t unmap_end = UKPLAT_RAM_END;
 	int i;
 
 	UK_ASSERT(bi);
 
-	unmap_end = ALIGN_DOWN(bpt_unmap_mrd.vbase + bpt_unmap_mrd.len,
-			       __PAGE_SIZE);
 	for (i = (int)bi->mrds.count - 1; i >= 0; i--) {
 		ukplat_memregion_get(i, &mrdp);
 		if (mrdp->vbase >= unmap_end) {
@@ -612,4 +548,4 @@ int ukplat_mem_init(void)
 
 	return 0;
 }
-#endif /* !CONFIG_HAVE_PAGING */
+#endif /* !CONFIG_PAGING */
