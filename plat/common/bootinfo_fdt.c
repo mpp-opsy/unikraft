@@ -99,8 +99,7 @@ static void fdt_bootinfo_cmdl_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 
 	cmdl = ukplat_memregion_alloc(fdt_cmdl_len + sizeof(CONFIG_UK_NAME) + 1,
 				      UKPLAT_MEMRT_CMDLINE,
-				      UKPLAT_MEMRF_READ |
-				      UKPLAT_MEMRF_MAP);
+				      UKPLAT_MEMRF_READ);
 	if (unlikely(!cmdl))
 		ukplat_bootinfo_crash("Command-line alloc failed\n");
 
@@ -168,7 +167,7 @@ static void fdt_bootinfo_fdt_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 	mrd.pbase = (__paddr_t)fdtp;
 	mrd.len   = fdt_totalsize(fdtp);
 	mrd.type  = UKPLAT_MEMRT_DEVICETREE;
-	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+	mrd.flags = UKPLAT_MEMRF_READ;
 
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
 	if (unlikely(rc < 0))
