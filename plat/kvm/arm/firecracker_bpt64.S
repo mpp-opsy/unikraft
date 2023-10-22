@@ -17,19 +17,8 @@
  * Notice: The page tables below use the Unikraft indexing convention (x86).
  */
 .section .data
-.align 4
-.global bpt_unmap_mrd
-bpt_unmap_mrd:
-	.quad	0x0000000080000000		/* 1 GiB */
-	.quad	0x0000000080000000		/* 1 GiB */
-	.quad	0x0000000000000000		/* Page-aligned */
-	/* FIXME: Unmap to 1TiB */
-	.quad	(255 - 1) * 0x0000000080000000
-	.quad	(255 - 1) * 0x0000000000080000  /* Page count */
-	.short	0x0000000000000000
-	.short	0x0000000000000010		/* UKPLAT_MEMRF_UNMAP */
-	.space	36
 
+.align 12
 .global arm64_bpt_l3_pt0
 
 /* L3: 0 - 2TiB (512GiB / entry)

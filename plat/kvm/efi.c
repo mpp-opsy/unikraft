@@ -8,8 +8,8 @@
 #include <uk/arch/paging.h>
 #include <uk/libid.h>
 #include <uk/plat/common/bootinfo.h>
+#include <uk/platform.h>
 
-extern struct ukplat_memregion_desc bpt_unmap_mrd;
 static uk_efi_paddr_t uk_efi_alloc_max_paddr;
 
 /* We must ensure backwards compatibility with !CONFIG_HAVE_PAGING */
@@ -135,7 +135,7 @@ static void uk_efi_init_vars(uk_efi_hndl_t self_hndl,
 	uk_efi_rs = sys_tbl->runtime_services;
 	uk_efi_sh = self_hndl;
 
-	uk_efi_alloc_max_paddr = bpt_unmap_mrd.pbase + bpt_unmap_mrd.len;
+	uk_efi_alloc_max_paddr = UKPLAT_RAM_END;
 }
 
 /* Convert an EFI Memory Descriptor to a ukplat_memregion_desc */
