@@ -355,6 +355,27 @@ static int vfscore_automount_rootfs(void)
 }
 
 #else /* !CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
+#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
+static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
+{
+	struct ukplat_memregion_desc *initrd;
+	int rc;
+
+	UK_ASSERT(vv);
+
+	/* TODO: Support multiple Initial RAM Disks */
+	rc = ukplat_memregion_find_initrd0(&initrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_crit("Could not find an initrd!\n");
+
+		return -1;
+	}
+
+	return do_mount_initrd((void *)initrd->vbase + initrd->pg_off,
+			       initrd->len, vv->path);
+}
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+
 static int vfscore_automount_rootfs(void)
 {
 	/* Convert to `struct vfscore_volume` */
