@@ -21,7 +21,6 @@
 #include <libfdt.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
-#include <arm/cpu.h>
 
 /* PL011 UART registers and masks*/
 /* Data register */
@@ -70,9 +69,9 @@
  * use pl011_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-#if defined(CONFIG_EARLY_PRINT_PL011_UART_ADDR)
+#if defined(CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE)
 static uint8_t pl011_uart_initialized = 1;
-static uint64_t pl011_uart_bas = CONFIG_EARLY_PRINT_PL011_UART_ADDR;
+static uint64_t pl011_uart_bas = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
 #else
 static uint8_t pl011_uart_initialized;
 static uint64_t pl011_uart_bas;
@@ -145,7 +144,7 @@ static void pl011_write(char a)
 {
 	/*
 	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_EARLY_PRINT_PL011_UART is not enabled.
+	 * or CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE is not enabled.
 	 */
 	if (!pl011_uart_initialized)
 		return;
@@ -169,7 +168,7 @@ static int pl011_getc(void)
 {
 	/*
 	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_EARLY_PRINT_PL011_UART is not enabled.
+	 * or CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE is not enabled.
 	 */
 	if (!pl011_uart_initialized)
 		return -1;
