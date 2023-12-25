@@ -60,6 +60,7 @@ extern "C" {
 #define UKPLAT_MEMRT_CMDLINE		0x0010	/* Command line */
 #define UKPLAT_MEMRT_DEVICETREE		0x0020	/* Device tree */
 #define UKPLAT_MEMRT_STACK		0x0040	/* Thread stack */
+#define UKPLAT_MEMRT_DEVICE		0x0080	/* Device region */
 
 /* Memory region flags */
 #define UKPLAT_MEMRF_ALL		0xffff
@@ -107,6 +108,7 @@ struct ukplat_memregion_desc {
  *	UKPLAT_MEMRT_CMDLINE		0x0010	Command line
  *	UKPLAT_MEMRT_DEVICETREE		0x0020	Device tree
  *	UKPLAT_MEMRT_STACK		0x0040	Thread stack
+ *	UKPLAT_MEMRT_DEVICE		0x0080	Device
  * @param mrd pointer to the memory region descriptor whose type to validate
  */
 #define UK_ASSERT_VALID_MRD_TYPE(mrd)					\
@@ -125,6 +127,8 @@ struct ukplat_memregion_desc {
 		case UKPLAT_MEMRT_DEVICETREE:				\
 			__fallthrough;					\
 		case UKPLAT_MEMRT_STACK:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_DEVICE:				\
 			break;						\
 		default:						\
 			UK_CRASH("Invalid mrd type: %hu\n",		\
