@@ -83,8 +83,7 @@ static void __linuxu_plat_heap_init(void)
 					.len   = len,
 					.type  = UKPLAT_MEMRT_FREE,
 					.flags = UKPLAT_MEMRF_READ |
-						 UKPLAT_MEMRF_WRITE |
-						 UKPLAT_MEMRF_MAP,
+						 UKPLAT_MEMRF_WRITE,
 				});
 			if (unlikely(rc < 0))
 				uk_pr_err("Failed to add heap memory region descriptor.");
@@ -138,8 +137,7 @@ static void __linuxu_plat_initrd_init(void)
 					.len   = len,
 					.type  = UKPLAT_MEMRT_INITRD,
 					.flags = UKPLAT_MEMRF_READ |
-						 UKPLAT_MEMRF_WRITE |
-						 UKPLAT_MEMRF_MAP,
+						 UKPLAT_MEMRF_WRITE,
 				});
 			if (unlikely(rc < 0))
 				uk_pr_err("Failed to add initrd memory region descriptor.");
