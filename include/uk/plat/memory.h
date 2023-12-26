@@ -70,9 +70,6 @@ extern "C" {
 #define UKPLAT_MEMRF_WRITE		0x0002	/* Region is writable */
 #define UKPLAT_MEMRF_EXECUTE		0x0004	/* Region is executable */
 
-#define UKPLAT_MEMRF_UNMAP		0x0010	/* Must be unmapped at boot */
-#define UKPLAT_MEMRF_MAP		0x0020	/* Must be mapped at boot */
-
 /**
  * Descriptor of a memory region
  */
@@ -143,8 +140,6 @@ struct ukplat_memregion_desc {
  *	UKPLAT_MEMRF_READ		0x0001	Region is readable
  *	UKPLAT_MEMRF_WRITE		0x0002	Region is writable
  *	UKPLAT_MEMRF_EXECUTE		0x0004	Region is executable
- *	UKPLAT_MEMRF_UNMAP		0x0010	Must be unmapped at boot
- *	UKPLAT_MEMRF_MAP		0x0020	Must be mapped at boot
  *
  * @param mrd pointer to the memory region descriptor whose type to validate
  */
@@ -152,9 +147,7 @@ struct ukplat_memregion_desc {
 	do {								\
 		__u16 flags_all = UKPLAT_MEMRF_READ    |		\
 				  UKPLAT_MEMRF_WRITE   |		\
-				  UKPLAT_MEMRF_EXECUTE |		\
-				  UKPLAT_MEMRF_UNMAP   |		\
-				  UKPLAT_MEMRF_MAP;			\
+				  UKPLAT_MEMRF_EXECUTE;			\
 									\
 		UK_ASSERT(((mrd)->flags & flags_all) == (mrd)->flags);	\
 	} while(0);
