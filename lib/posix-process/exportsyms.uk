@@ -90,3 +90,6 @@ uk_syscall_r_vfork
 uk_syscall_e_vfork
 uk_syscall_r_e_vfork
 uk_syscall_e_e_vfork
+rt_sigprocmask
+uk_syscall_r_rt_sigprocmask
+uk_syscall_e_rt_sigprocmask
