@@ -49,6 +49,10 @@
 #endif /* !CONFIG_LIBUKCONSOLE */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+void uk_signal_deliver(struct uk_syscall_ctx *usc);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
 /**
  * This is a convenience structure. The earlier architecture specific system
  * call entry call chain ensures that the execenv's of the caller is fully
@@ -146,6 +150,10 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 	uk_pr_info(prsyscallbuf);
 #endif /* !CONFIG_LIBUKCONSOLE */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	uk_signal_deliver(usc);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	t->tlsp = ukarch_sysctx_get_tlsp(&execenv->sysctx);
