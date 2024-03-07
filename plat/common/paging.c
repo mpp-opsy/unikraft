@@ -1436,12 +1436,15 @@ static inline unsigned long bootinfo_to_page_attr(__u16 flags)
 	return prot;
 }
 
-extern struct ukplat_memregion_desc bpt_unmap_mrd;
+#include <uk/platform.h> /* FIXME */
 
 int ukplat_paging_init(void)
 {
 	struct ukplat_memregion_desc *mrd;
 	unsigned long prot;
+	__vaddr_t vaddr;
+	__sz unmap_len;
+	__sz len;
 	int rc;
 
 	/* Initialize the frame allocator with the free physical memory
@@ -1451,10 +1454,6 @@ int ukplat_paging_init(void)
 	rc = -ENOMEM; /* In case there is no region */
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
 		UK_ASSERT_VALID_FREE_MRD(mrd);
-
-		/* Not mapped */
-		mrd->vbase = __U64_MAX;
-		mrd->flags &= ~UKPLAT_MEMRF_PERMS;
 
 		if (!kernel_pt.fa) {
 			rc = ukplat_pt_init(&kernel_pt, mrd->pbase,
@@ -1483,46 +1482,121 @@ int ukplat_paging_init(void)
 	if (unlikely(!kernel_pt.fa))
 		return rc;
 
-	/* Perform unmappings */
-	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_UNMAP,
-				 UKPLAT_MEMRF_UNMAP) {
-		/* Ensure unmap memory region descriptors correctness */
-		/* Must be non-empty and aligned end-to-end */
-		UK_ASSERT(mrd->len);
-		UK_ASSERT(mrd->pg_count * PAGE_SIZE == mrd->len);
-		UK_ASSERT(!(mrd->vbase & ~PAGE_MASK));
-		UK_ASSERT(!mrd->pg_off);
-		/* Physical base address must be 0 */
-		UK_ASSERT(!mrd->pbase);
-		/* Virtual base address must be a valid value */
-		UK_ASSERT(mrd->vbase != __U64_MAX);
+	/* Now map any regions required by the mrd list */
 
-		rc = ukplat_page_unmap(&kernel_pt, mrd->vbase,
-				       mrd->pg_count,
-				       PAGE_FLAG_KEEP_FRAMES);
-		if (unlikely(rc))
-			return rc;
-	}
+	__vaddr_t this_region_base, this_region_end;
+	__vaddr_t last_region_end;
 
-	/* Perform mappings */
-	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_MAP,
-				 UKPLAT_MEMRF_MAP) {
-		UK_ASSERT_VALID_MRD(mrd);
-		/* Do not allow mapping of free memory regions */
-		UK_ASSERT(mrd->type != UKPLAT_MEMRT_FREE);
+	last_region_end  = UKPLAT_RAM_BASE;
 
-#if defined(CONFIG_ARCH_ARM_64)
-		if (!RANGE_CONTAIN(bpt_unmap_mrd.pbase, bpt_unmap_mrd.len,
-				   mrd->pbase, mrd->pg_count * PAGE_SIZE))
+	ukplat_memregion_foreach(&mrd, 0, 0, 0) {
+
+		UK_ASSERT(IS_ALIGNED(mrd->vbase, __PAGE_SIZE));
+		UK_ASSERT(IS_ALIGNED(mrd->pbase, __PAGE_SIZE));
+		UK_ASSERT(mrd->pg_count);
+
+		len = mrd->pg_count * __PAGE_SIZE;
+
+		this_region_base = mrd->vbase;
+		this_region_end = mrd->vbase + len;
+
+		/* If this_region_base > last_region_end, then there is
+		 * a hole between the two mrds. Unmap that region.
+		 */
+		if (this_region_base > last_region_end) {
+			unmap_len = this_region_base - last_region_end;
+
+			uk_pr_err("0x%016" __PRIx64 " - 0x%016" __PRIx64 " unmap\n",
+				  last_region_end, last_region_end + unmap_len);
+
+			rc = ukplat_page_unmap(&kernel_pt, last_region_end,
+					       PAGE_COUNT(unmap_len), 0);
+			if (unlikely(rc < 0)) {
+				uk_pr_err("Could not unmap region @ 0x%lx - 0x%lx\n",
+					  mrd->vbase, mrd->vbase + unmap_len);
+				return rc;
+			}
+		}
+
+		last_region_end = this_region_end;
+
+		/* Device regions are managed by device drivers.
+		 * Free memory regions is managed by the frame
+		 * allocator.
+		 */
+		if (mrd->type & UKPLAT_MEMRT_DEVICE ||
+		    mrd->type & UKPLAT_MEMRT_FREE) {
+			uk_pr_debug("0x%016" __PRIx64 " - 0x%016" __PRIx64 " ignore\n",
+				  mrd->vbase, mrd->vbase + len);
 			continue;
-#endif
+		}
 
-		prot  = bootinfo_to_page_attr(mrd->flags);
+		prot = bootinfo_to_page_attr(mrd->flags);
 
 		rc = ukplat_page_map(&kernel_pt, mrd->vbase, mrd->pbase,
-				     mrd->pg_count, prot, 0);
-		if (unlikely(rc))
+				     PAGE_COUNT(len), prot, 0);
+
+		/* If the region was successfully mapped it also means that the
+		 * protections of bootinfo were applied. Continue to the next
+		 * region.
+		 */
+		if (!rc) {
+			uk_pr_debug("0x%016" __PRIx64 " - 0x%016" __PRIx64 " map %c%c%c\n",
+				  mrd->pbase, mrd->pbase + len,
+				  (prot & PAGE_ATTR_PROT_READ)  ? 'r' : '-',
+				  (prot & PAGE_ATTR_PROT_WRITE) ? 'w' : '-',
+				  (prot & PAGE_ATTR_PROT_EXEC)  ? 'x' : '-');
+			continue;
+		}
+
+		/* If the region was already mapped, update the protections to
+		 * those defined in bootinfo.
+		 */
+		if (unlikely(rc && rc != -EEXIST)) {
+			uk_pr_err("Could not map region @ va: 0x%lx / pa: 0x%lx\n",
+				  mrd->vbase, mrd->pbase);
 			return rc;
+		}
+
+		uk_pr_debug("0x%016" __PRIx64 " - 0x%016" __PRIx64 " upd %c%c%c\n",
+			  mrd->pbase, mrd->pbase + len,
+			  (prot & PAGE_ATTR_PROT_READ)  ? 'r' : '-',
+			  (prot & PAGE_ATTR_PROT_WRITE) ? 'w' : '-',
+			  (prot & PAGE_ATTR_PROT_EXEC)  ? 'x' : '-');
+
+		rc = ukplat_page_set_attr(&kernel_pt, mrd->vbase,
+					  PAGE_COUNT(len),
+					  prot, 0);
+
+		if (unlikely(rc)) {
+			uk_pr_err("Could not set attributes of region @ 0x%lx - 0x%lx\n",
+				  mrd->vbase, mrd->vbase + len);
+			return rc;
+		}
+
+		/* All free memory has already been assigned to the
+		 * frame allocator. Mark as invalid just in case.
+		 */
+		if (mrd->type == UKPLAT_MEMRT_FREE) {
+			mrd->vbase = __U64_MAX;
+			mrd->flags &= ~UKPLAT_MEMRF_PERMS;
+		}
+	}
+
+	/* Treat any memory past the last memreg as a hole */
+	if (last_region_end < UKPLAT_RAM_END) {
+		vaddr = last_region_end;
+		len   = UKPLAT_RAM_END - last_region_end;
+
+		uk_pr_debug("0x%016" __PRIx64 " - 0x%016" __PRIx64 " unmap\n",
+			  last_region_end, last_region_end + len);
+
+		rc = ukplat_page_unmap(&kernel_pt, vaddr, PAGE_COUNT(len), 0);
+		if (unlikely(rc < 0)) {
+			uk_pr_err("Could not unmap region @ 0x%lx - 0x%lx\n",
+				  vaddr, vaddr + len);
+			return rc;
+		}
 	}
 
 	/* Activate page table */
