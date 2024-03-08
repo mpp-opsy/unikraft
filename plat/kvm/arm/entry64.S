@@ -128,14 +128,23 @@ ENTRY(_libkvmplat_entry)
 	/* Enable the mmu */
 	bl start_mmu
 
-	/* Load dtb address to x0 as a parameter */
+	/* Initialize early devices */
 #if defined(CONFIG_KVM_BOOT_PROTO_LXBOOT)
-	mov x0, x25
+	mov x0, x25      /* dtb in x0 */
 #elif defined(CONFIG_KVM_BOOT_PROTO_QEMU_VIRT)
-	ur_ldr  x0, _dtb
+	ur_ldr  x0, _dtb /* dtb in x0 */
+#endif
+	bl      kvm_early_init_fdt
+
+	/* Populate bootinfo */
+#if defined(CONFIG_KVM_BOOT_PROTO_LXBOOT)
+	mov x0, x25      /* dtb in x0 */
+#elif defined(CONFIG_KVM_BOOT_PROTO_QEMU_VIRT)
+	ur_ldr  x0, _dtb /* dtb in x0 */
 #endif
 	bl ukplat_bootinfo_fdt_setup
 
-	bl ukplat_bootinfo_get
+	/* Pass control to platform entry */
+	bl ukplat_bootinfo_get /* bootinfo in x0 */
 	b _ukplat_entry
 END(_libkvmplat_entry)
