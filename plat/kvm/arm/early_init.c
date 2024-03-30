@@ -7,7 +7,25 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 
-void kvm_early_init_fdt(void *fdt)
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+#include <uk/tty/pl011.h>
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+#include <uk/tty/ns16550.h>
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
+int kvm_early_init_fdt(void *fdt __maybe_unused)
 {
-	/* Placeholder for early device initialization */
+	int rc __maybe_unused = 0;
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+	rc = ns16550_early_init();
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+	rc = pl011_early_init();
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+
+	return rc;
 }
