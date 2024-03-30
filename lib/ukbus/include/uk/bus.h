@@ -42,9 +42,13 @@
 extern "C" {
 #endif
 
-#define UK_BUS_INIT_CLASS UK_INIT_CLASS_PLAT
-#define UK_BUS_INIT_PRIO  0
-#define UK_BUS_REGISTER_PRIO 0
+#define UK_BUS_INIT_CLASS UK_INIT_CLASS_SYS
+
+/* Console initalized at prio 0, initialize ukbus at lower
+ * priority to make sure that drives can print info.
+ */
+#define UK_BUS_INIT_PRIO	UK_PRIO_AFTER(0)
+#define UK_BUS_REGISTER_PRIO	0
 
 struct uk_bus;
 extern struct uk_list_head uk_bus_list;
