@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+
+import git
+import subprocess
+import sys
+import re
+
+DEBUG = False
+
+def git_command(args):
+    return subprocess.run(["git", "bisect"] + args)
+
+def get_pr(commit):
+    match = re.search("GitHub-Closes: #(\d*)\n", commit.message)
+    if match == None:
+        raise Exception()
+    return match.groups()[0]
+
+def print_d(msg):
+    if DEBUG:
+        print(msg)
+
+def main():
+
+    # Default can be overriden with "git bisect term"
+    term_good = "good"
+    term_bad  = "bad"
+
+    try:
+        repo = git.Repo(".", search_parent_directories=True)
+    except Exception:
+        print("[+] Error: Could not find git repository")
+        return 1
+
+    # If called without args, let git return usage
+    if len(sys.argv) == 1:
+        res = git_command(sys.argv[1:])
+        return res.returncode
+
+    # TODO trap "git bisect terms" and update term_good / term_bad
+
+    # Execute user command
+    rc = git_command(sys.argv[1:]).returncode
+
+    # If the command was anything other than good / bad we're done
+    if sys.argv[1] != term_good and sys.argv[1] != term_bad:
+        print_d("[+] Passthrough git bisect {}".format(sys.argv[1:]))
+        return rc
+
+    # Trap good / bad, and skip if the current commit is not the top
+    # in its PR.
+    print_d("[+] trapped " + str(sys.argv[1:]))
+
+    # TODO handle "bit bisect <term> <rev>"
+
+    # Determine the starting point of bisect
+    # FIXME Derive that via PythonGit
+    try:
+        with open(repo.common_dir + '/BISECT_START', 'r') as file:
+            bisect_start = repo.commit(file.read().rstrip())
+    except:
+        print("[+] Error: Could not derive starting point of bisect")
+        return 1
+
+    print_d("[+] bisect_start: " + bisect_start.hexsha)
+
+    # Derive current commit and PR
+    this_commit = repo.commit("HEAD")
+
+    print_d("[+] this_commit: " + this_commit.hexsha)
+
+    try:
+        this_pr = get_pr(this_commit)
+    except Exception:
+        # A commit without a tag is something we can't handle,
+        # so skip. Hopefully bisect will eventually lead to a
+        # resolution.
+        print("[+] skipping (no PR tag)")
+        return git_command(["skip"]).returncode
+
+    print_d("[+] this_pr: " + this_pr)
+
+    while True:
+        # Get the next commit
+        *_, next_commit = repo.iter_commits(bisect_start.hexsha + "..." + this_commit.hexsha)
+        print_d("[+] next_commit: " + next_commit.hexsha)
+
+        # Get the PR of the next commit
+        try:
+            next_pr = get_pr(next_commit)
+        except Exception:
+            # A commit without a tag is something we can't handle,
+            # so skip. Hopefully bisect will eventually lead to a
+            # resolution.
+            print("[+] skipping (no next PR tag)")
+            return git_command(["skip"]).returncode
+
+        print_d("[+] next_pr: " + next_pr)
+
+        # The PR tag of this commit is different than the next one's. Therefore,
+        # this commit is either the top-most or the only one in its PR.
+        if next_pr != this_pr:
+            break
+
+        # This commit has the same tag as the next one, so it is not
+        # the top of the PR. Tell bisect to skip. If there no more
+        # commits to try git will let the user know.
+        print("[+] skipping (not top of PR)")
+        return git_command(["skip"]).returncode
+
+    return
+
+if __name__ == "__main__":
+    sys.exit(main())
