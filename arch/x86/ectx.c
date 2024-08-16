@@ -40,7 +40,7 @@
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/print.h>
-#include <uk/hexdump.h>
+#include <uk/print/hexdump.h>
 #include <uk/isr/string.h> /* memset_isr */
 
 enum x86_save_method {
@@ -215,12 +215,12 @@ void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
 	if (memcmp_isr(current, state, ectx_size) != 0) {
 		uk_pr_crit("Modified ECTX detected!\n");
 		uk_pr_crit("Current:\n");
-		uk_hexdumpk(KLVL_CRIT, current, ectx_size,
+		uk_hexdumpk(UK_PRINT_KLVL_CRIT, current, ectx_size,
 			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
 			    2);
 
 		uk_pr_crit("Expected:\n");
-		uk_hexdumpk(KLVL_CRIT, state, ectx_size,
+		uk_hexdumpk(UK_PRINT_KLVL_CRIT, state, ectx_size,
 			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
 			    2);
 
