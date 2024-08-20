@@ -15,16 +15,11 @@
 #include <uk/libparam.h>
 #endif /* CONFIG_LIBUKLIBPARAM */
 
-/* Copy of bi->cmdline, as the boot protocol buffer may
- * be unmapped by paged memory init.
- */
-static char cmdline[CONFIG_LIBUKBOOT_CMDLINE_MAX_LEN];
-static __sz cmdline_len;
-
 /* Mutable version of the cmdline. This is tokenized by uk_argnparse().
  * Keep this as a global as `argv` points to tokens in this string.
  */
-static char cmdline_parse[CONFIG_LIBUKBOOT_CMDLINE_MAX_LEN];
+static char cmdline[CONFIG_LIBUKBOOT_CMDLINE_MAX_LEN];
+static __sz cmdline_len;
 
 char *arg_vect[CONFIG_LIBUKBOOT_MAXNBARGS];
 char **boot_argv = arg_vect; /* updated if CONFIG_LIBUKPARAM */
@@ -57,16 +52,11 @@ static int uk_boot_early_init_parse_cmdl(struct ukplat_bootinfo *bi)
 		return rc;
 	}
 
-	/* Update bi->cmdline */
-	strncpy(cmdline, cmdl, ARRAY_SIZE(cmdline));
-	cmdline[cmdline_len] = 0;
-	bi->cmdline = (__u64)cmdline;
-
 	/* Break down cmdline to argv */
-	strncpy(cmdline_parse, cmdl, ARRAY_SIZE(cmdline_parse));
-	cmdline_parse[cmdline_len] = '\0';
+	strncpy(cmdline, cmdl, ARRAY_SIZE(cmdline));
+	cmdline[cmdline_len] = '\0';
 
-	boot_argc = uk_argnparse(cmdline_parse, cmdline_len, boot_argv,
+	boot_argc = uk_argnparse(cmdline, cmdline_len, boot_argv,
 				 CONFIG_LIBUKBOOT_MAXNBARGS);
 
 #if CONFIG_LIBUKLIBPARAM
@@ -99,6 +89,12 @@ static int uk_boot_early_init_parse_cmdl(struct ukplat_bootinfo *bi)
 	}
 #endif /* CONFIG_LIBUKLIBPARAM */
 
+	/* Prevent bi->cmdline from being accessed later
+	 * as, depending on the boot protocol, it may be
+	 * in memory that is unmapped at memory_init().
+	 */
+	bi->cmdline = (__u64)NULL;
+
 	return 0;
 }
 
@@ -115,6 +111,8 @@ void uk_boot_early_init(struct ukplat_bootinfo *bi)
 	int rc;
 
 	UK_ASSERT(bi);
+
+	ukplat_bootinfo_print();
 
 	uk_boot_earlytab_foreach(entry) {
 		UK_ASSERT(entry);
