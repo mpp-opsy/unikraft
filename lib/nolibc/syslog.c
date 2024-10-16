@@ -46,9 +46,7 @@ static const int level_map[] = {
 	UK_PRINT_KLVL_WARN, /* LOG_WARNING */
 	UK_PRINT_KLVL_INFO, /* LOG_NOTICE */
 	UK_PRINT_KLVL_INFO, /* LOG_INFO */
-
-	/* This one maps to a different macro on unikraft */
-	/* UK_PRINT_KLVL_INFO, */ /* LOG_DEBUG */
+	UK_PRINT_KLVL_DEBUG, /* LOG_DEBUG */
 };
 
 static const char *facility_to_str(int facility)
@@ -127,14 +125,9 @@ void vsyslog(int priority, const char *format, va_list ap)
 	priority &= LOG_PRIMASK;
 
 	/* Forward call */
-	if (priority == LOG_DEBUG) {
-		uk_printd("[%s] ", facility_to_str(facility));
-		uk_printd(format, ap);
-	} else {
-		priority = MAX(priority, 0);
-		priority = MIN(priority, (int)ARRAY_SIZE(level_map));
-		uk_printk(level_map[priority], "[%s] ",
-			  facility_to_str(facility));
-		uk_printk(level_map[priority], format, ap);
-	}
+	priority = MAX(priority, 0);
+	priority = MIN(priority, (int)ARRAY_SIZE(level_map));
+	uk_printk(level_map[priority], "[%s] ",
+		  facility_to_str(facility));
+	uk_printk(level_map[priority], format, ap);
 }
