@@ -71,6 +71,14 @@ config LIBUKPRINT_ANSI_COLOR
 		Before activating this option, please make sure that
 		your console output/display supports ANSI.
 
+config LIBUKPRINT_PRINTK_UKSTORE
+	bool "Control verbosity via ukstore"
+	select LIBUKSTORE
+	help
+		Allows configuring the console verbosity at runtime via ukstore.
+		The maximum verbosity is still bound to the highest verbosity
+		level configured at compile time.
+
 endif
 
 menuconfig LIBUKPRINT_LOGBUF
