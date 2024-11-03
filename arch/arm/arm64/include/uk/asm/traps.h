@@ -36,17 +36,28 @@
 
 #ifndef __ASSEMBLY__
 
+enum arm64_exception {
+	ARM64_EXCEPTION_INVALID_OP,
+	ARM64_EXCEPTION_DEBUG,
+	ARM64_EXCEPTION_PAGE_FAULT,
+	ARM64_EXCEPTION_BUS_ERROR,
+	ARM64_EXCEPTION_MATH,
+	ARM64_EXCEPTION_SECURITY,
+	ARM64_EXCEPTION_SYSCALL,
+	ARM64_EXCEPTION_MAX
+};
+
 /**
  * This structure stores trap context information. It is supplied as data
  * for trap event handlers.
  */
 struct ukarch_trap_ctx {
+	enum arm64_exception eid;
+	const char *str;
+	__u64 esr;
+	__u64 far;
+	int uk_errno;
 	struct __regs *regs;
-	unsigned long esr;
-	int el;
-	int reason;
-
-	unsigned long far;
 };
 
 #endif /* !__ASSEMBLY__ */
