@@ -1224,16 +1224,16 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0,
 			    PT_CLONEFLAGS,
 			    PT_VADDR, /* sp */
-			    PT_TID | PT_REF, /* ref to parent tid */
-			    PT_TID | PT_REF, /* ref to child tid */
+			    PT_VADDR, /* ref to parent tid */
+			    PT_VADDR, /* ref to child tid */
 			    PT_VADDR /* tlsp */);
 #else /* !CONFIG_ARCH_X86_64 */
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0,
 			    PT_CLONEFLAGS,
 			    PT_VADDR, /* sp */
-			    PT_TID | PT_REF, /* ref to parent tid */
+			    PT_VADDR, /* ref to parent tid */
 			    PT_VADDR, /* tlsp */
-			    PT_TID | PT_REF /* ref to child tid */);
+			    PT_VADDR /* ref to child tid */);
 #endif /* !CONFIG_ARCH_X86_64 */
 		PR_SYSRET(sb, fmtf, PT_TID, rc);
 		break;
